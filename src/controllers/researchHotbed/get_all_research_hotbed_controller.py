@@ -20,6 +20,7 @@ def list_research_hotbeds():
                 "faculty_researchHotbed": hotbed.faculty_researchHotbed,
                 "status_researchHotbed": hotbed.status_researchHotbed,
                 "dateCreation_researchHotbed": hotbed.dateCreation_researchHotbed,
+                "deleteDescription_researchHotbed": hotbed.deleteDescription_researchHotbed,
             }
             for hotbed in research_hotbeds
         ]
