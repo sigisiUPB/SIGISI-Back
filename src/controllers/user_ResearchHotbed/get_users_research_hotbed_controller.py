@@ -21,10 +21,12 @@ def get_users_by_research_hotbed(research_hotbed_id):
 
     # Formatear la respuesta
     users_list = [{
+
         "iduser": user.iduser,
         "name_user": user.name_user,
         "email_user": user.email_user,
         "idSigaa_user": user.idSigaa_user,
+        "idusersResearchHotbed": relation.idusersResearchHotbed,
         "status_usersResearchHotbed": relation.status_usersResearchHotbed,
         "TypeUser_usersResearchHotbed": relation.TypeUser_usersResearchHotbed,
         "observation_usersResearchHotbed": relation.observation_usersResearchHotbed,
