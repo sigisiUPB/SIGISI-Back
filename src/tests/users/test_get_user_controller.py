@@ -2,7 +2,7 @@ import pytest
 from models.users import User
 from datetime import datetime, timezone
 from db.connection import db
-from controllers.users.get_user_controller import get_user_data  # Asumiendo que el controlador está en controllers/user_controller.py
+from controllers.users.get_user_controller import get_user_data
 
 @pytest.fixture
 def setup_database():

@@ -2,7 +2,7 @@ from models.research_hotbed import ResearchHotbed
 from db.connection import db
 from flask import jsonify
 from datetime import datetime
-import pytz  # Importamos pytz para manejar husos horarios
+import pytz
 
 def create_research_hotbed(data):
     """

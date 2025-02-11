@@ -1,8 +1,8 @@
 from models.users import User
 from db.connection import db
 from datetime import datetime
-import hashlib  # Importamos hashlib para SHA-256
-import os       # Usaremos os para generar un salt
+import hashlib 
+import os      
 
 def hash_password(password):
     """Genera un hash SHA-256 con un salt único"""

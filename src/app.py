@@ -1,9 +1,9 @@
 import os
 from flask import Flask
 from db.connection import db, create_db_uri
-from routes.user_routes import user_routes  # Aquí importas directamente user_routes
+from routes.user_routes import user_routes
 from apscheduler.schedulers.background import BackgroundScheduler
-from utils.inactive_users import mark_inactive_users  # Importar la función desde inactiveUser.py
+from utils.inactive_users import mark_inactive_users
 from routes.research_hotbed_routes import research_hotbed_routes
 from routes.user_research_hotbed_routes import users_research_hotbed_routes
 
@@ -21,7 +21,7 @@ def create_app():
     # Registro de rutas
     app.register_blueprint(user_routes)  # Rutas de usuarios
     app.register_blueprint(research_hotbed_routes)  # Rutas de semilleros
-    app.register_blueprint(users_research_hotbed_routes)
+    app.register_blueprint(users_research_hotbed_routes) # Rutas de los usuarios que pertenecen a un semillero
 
     # Inicialización de APScheduler
     scheduler = BackgroundScheduler()

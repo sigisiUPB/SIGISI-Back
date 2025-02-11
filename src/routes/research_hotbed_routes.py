@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 from controllers.researchHotbed.get_all_research_hotbed_controller import list_research_hotbeds
 from controllers.researchHotbed.register_research_hotbed_controller import create_research_hotbed
-from controllers.researchHotbed.update_all_research_hotbed import update_research_hotbed
-from middlewares.auth import token_required  # Si deseas proteger la ruta con autenticación
+from controllers.researchHotbed.update_all_research_hotbed_controller import update_research_hotbed
+from middlewares.auth import token_required
 
 # Crear el Blueprint
 research_hotbed_routes = Blueprint('research_hotbed_routes', __name__)
