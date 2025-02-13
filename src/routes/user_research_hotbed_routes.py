@@ -3,7 +3,7 @@ from controllers.user_ResearchHotbed.add_user_research_hotbed_controller import 
 from middlewares.auth import token_required
 from controllers.user_ResearchHotbed.get_users_research_hotbed_controller import get_users_by_research_hotbed
 from controllers.user_ResearchHotbed.update_user_research_hotbed_controller import update_user_in_research_hotbed
-from controllers.user_ResearchHotbed.delete_user_research_hotbed_controller import delete_user_from_research_hotbed
+from controllers.user_ResearchHotbed.get_research_hotbeds_by_user_controller import get_research_hotbeds_by_user
 
 users_research_hotbed_routes = Blueprint("users_research_hotbed_routes", __name__)
 
@@ -28,8 +28,8 @@ def update_user_in_research_hotbed_route(user_research_hotbed_id):
     data = request.json
     return update_user_in_research_hotbed(user_research_hotbed_id, data)
 
-# Ruta para eliminar usuarios que pertenecen a un semillero
-@users_research_hotbed_routes.route("/delete/users-research-hotbeds/<int:user_research_hotbed_id>", methods=["DELETE"])
+# Ruta para listar los semilleros a los que pertenece un usuario
+@users_research_hotbed_routes.route("/get/users/<int:user_id>/by/research-hotbeds", methods=["GET"])
 @token_required
-def delete_user_from_research_hotbed_route(user_research_hotbed_id):
-    return delete_user_from_research_hotbed(user_research_hotbed_id)
+def get_research_hotbeds_by_user_route(user_id):
+    return get_research_hotbeds_by_user(user_id)
