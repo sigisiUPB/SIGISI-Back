@@ -3,7 +3,7 @@ from controllers.user_ResearchHotbed.add_user_research_hotbed_controller import 
 from middlewares.auth import token_required
 from controllers.user_ResearchHotbed.get_users_research_hotbed_controller import get_users_by_research_hotbed
 from controllers.user_ResearchHotbed.update_user_research_hotbed_controller import update_user_in_research_hotbed
-from controllers.user_ResearchHotbed.get_research_hotbeds_by_user_controller import get_research_hotbeds_by_user
+from controllers.user_ResearchHotbed.get_research_hotbeds_by_user_controller import get_active_research_hotbeds_by_user
 
 users_research_hotbed_routes = Blueprint("users_research_hotbed_routes", __name__)
 
@@ -32,4 +32,4 @@ def update_user_in_research_hotbed_route(user_research_hotbed_id):
 @users_research_hotbed_routes.route("/get/users/<int:user_id>/by/research-hotbeds", methods=["GET"])
 @token_required
 def get_research_hotbeds_by_user_route(user_id):
-    return get_research_hotbeds_by_user(user_id)
+    return get_active_research_hotbeds_by_user(user_id)
