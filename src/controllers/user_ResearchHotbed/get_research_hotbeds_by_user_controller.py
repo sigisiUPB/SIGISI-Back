@@ -20,7 +20,7 @@ def get_active_research_hotbeds_by_user(user_id):
     ).join(UsersResearchHotbed, ResearchHotbed.idresearchHotbed == UsersResearchHotbed.researchHotbed_idresearchHotbed
     ).filter(
         UsersResearchHotbed.user_iduser == user_id,
-        UsersResearchHotbed.status_usersResearchHotbed == "Active"
+        UsersResearchHotbed.status_usersResearchHotbed == "Activo"
     ).all()
 
     if not active_hotbeds:
