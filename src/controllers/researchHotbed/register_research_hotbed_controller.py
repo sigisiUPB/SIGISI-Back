@@ -42,7 +42,9 @@ def create_research_hotbed(data):
         db.session.add(research_hotbed)
         db.session.commit()
 
-        return {"message": "Semillero registrado con éxito."}, 201
+        new_id = research_hotbed.idresearchHotbed
+
+        return {"message": "Semillero registrado con éxito.", "idresearchHotbed": new_id}, 201
 
     except Exception as e:
         db.session.rollback()
