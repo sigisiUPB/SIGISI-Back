@@ -1,11 +1,11 @@
 from models.users import User
 from flask import jsonify
 from datetime import datetime, timedelta
-import pytz  # Para manejar zonas horarias
+import pytz 
 import hashlib
 import jwt
 import os
-from db.connection import db  # Asegúrate de importar la conexión de la base de datos
+from db.connection import db 
 
 def verify_password(stored_password, provided_password):
     # Verifica si la contraseña proporcionada coincide con el hash almacenado
