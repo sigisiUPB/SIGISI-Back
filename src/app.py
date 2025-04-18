@@ -6,6 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from utils.inactive_users import mark_inactive_users
 from routes.research_hotbed_routes import research_hotbed_routes
 from routes.user_research_hotbed_routes import users_research_hotbed_routes
+from routes.activities_routes import activities_routes
 
 def create_app():
     app = Flask(__name__) 
@@ -22,6 +23,7 @@ def create_app():
     app.register_blueprint(user_routes)  # Rutas de usuarios
     app.register_blueprint(research_hotbed_routes)  # Rutas de semilleros
     app.register_blueprint(users_research_hotbed_routes) # Rutas de los usuarios que pertenecen a un semillero
+    app.register_blueprint(activities_routes)  # Rutas de actividades
 
     # Inicialización de APScheduler
     scheduler = BackgroundScheduler()

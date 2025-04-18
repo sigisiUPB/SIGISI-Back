@@ -1,36 +1,35 @@
-from flask import Blueprint, request, jsonify
-from models.activities_researchHotbed import ActivitiesResearchHotbed
+from datetime import datetime
+from flask import jsonify
 from models.projects_researchHotbed import ProjectsResearchHotbed
 from models.products_researchHotbed import ProductsResearchHotbed
 from models.recognitions_researchHotbed import RecognitionsResearchHotbed
+from models.activities_researchHotbed import ActivitiesResearchHotbed
 from db.connection import db
-from datetime import datetime
 
-# Blueprint solo para las rutas de actividades
-activities_bp = Blueprint('activities_bp', __name__)
-
-@activities_bp.route('/register_activity', methods=['POST'])
-def register_activity():
-    data = request.get_json()
-
+def register_activity(data):
     try:
-        # Crear el proyecto (opcional)
+        # Registrar el proyecto si se incluye en los datos
         project_id = None
         if 'project' in data:
             project_data = data['project']
+            # Procesar co_researchers como una cadena de nombres separados por comas
+            co_researchers = project_data.get('co_researchers', '')
+            if co_researchers:
+                co_researchers = ', '.join(co_researchers.split(','))  # Se asegura que esté en un formato correcto (cadena separada por comas)
+                
             project = ProjectsResearchHotbed(
                 name_projectsResearchHotbed=project_data['name'],
                 referenceNumber_projectsResearchHotbed=project_data['reference_number'],
                 startDate_projectsResearchHotbed=datetime.strptime(project_data['start_date'], '%Y-%m-%d'),
                 endDate_projectsResearchHotbed=datetime.strptime(project_data['end_date'], '%Y-%m-%d') if project_data.get('end_date') else None,
                 principalResearcher_projectsResearchHotbed=project_data['principal_researcher'],
-                coResearchers_projectsResearchHotbed=project_data.get('co_researchers')
+                coResearchers_projectsResearchHotbed=co_researchers  # Guardamos como cadena separada por comas
             )
             db.session.add(project)
-            db.session.flush()  # para obtener su id
+            db.session.flush()  # Para obtener su ID automáticamente
             project_id = project.idprojectsResearchHotbed
 
-        # Crear el producto (opcional)
+        # Registrar el producto si se incluye en los datos
         product_id = None
         if 'product' in data:
             product_data = data['product']
@@ -41,10 +40,10 @@ def register_activity():
                 datePublication_productsResearchHotbed=datetime.strptime(product_data['date_publication'], '%Y-%m-%d')
             )
             db.session.add(product)
-            db.session.flush()
+            db.session.flush()  # Para obtener su ID automáticamente
             product_id = product.idproductsResearchHotbed
 
-        # Crear el reconocimiento (opcional)
+        # Registrar el reconocimiento si se incluye en los datos
         recognition_id = None
         if 'recognition' in data:
             recognition_data = data['recognition']
@@ -55,10 +54,10 @@ def register_activity():
                 organizationName_recognitionsResearchHotbed=recognition_data['organization_name']
             )
             db.session.add(recognition)
-            db.session.flush()
+            db.session.flush()  # Para obtener su ID automáticamente
             recognition_id = recognition.idrecognitionsResearchHotbed
 
-        # Crear la actividad
+        # Registrar la actividad
         activity = ActivitiesResearchHotbed(
             title_activitiesResearchHotbed=data['title'],
             responsible_activitiesResearchHotbed=data['responsible'],
@@ -69,7 +68,7 @@ def register_activity():
             endTime_activitiesResearchHotbed=datetime.strptime(data['end_time'], '%H:%M').time() if data.get('end_time') else None,
             duration_activitiesResearchHotbed=data.get('duration'),
             approvedFreeHours_activitiesResearchHotbed=data.get('approved_free_hours'),
-            usersResearchHotbed_idusersResearchHotbed=data['user_research_hotbed_id'],
+            usersResearchHotbed_idusersResearchHotbed=data['user_research_hotbed_id'],  # ID del usuario que está creando la actividad
             projectsResearchHotbed_idprojectsResearchHotbed=project_id,
             productsResearchHotbed_idproductsResearchHotbed=product_id,
             recognitionsResearchHotbed_idrecognitionsResearchHotbed=recognition_id
