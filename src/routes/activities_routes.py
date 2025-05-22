@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from controllers.activitiesResearchHotbed.get_activities_controller import get_activity_details
+from controllers.activitiesResearchHotbed.get_activities_by_research_hotbed_controller import get_activities_by_research_hotbed
 from middlewares.auth import token_required
 from controllers.activitiesResearchHotbed.register_activities_controller import register_activity
 from controllers.activitiesResearchHotbed.update_activities_controller import update_activity
@@ -18,6 +19,12 @@ def register_activity_route():
 @token_required
 def get_activity(activity_id):
     return get_activity_details(activity_id)
+
+# Nueva ruta para obtener actividades por semillero
+@activities_routes.route("/get/research-hotbeds/<int:research_hotbed_id>/activities", methods=['GET'])
+@token_required
+def get_research_hotbed_activities(research_hotbed_id):
+    return get_activities_by_research_hotbed(research_hotbed_id)
 
 # Ruta para actualizar actividad
 @activities_routes.route("/updateActivity/<int:activity_id>", methods=["PUT"])
