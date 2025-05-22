@@ -5,7 +5,7 @@ from controllers.users.login_controller import login_user
 from controllers.users.get_user_controller import get_user_data
 from controllers.users.update_user import update_user
 from controllers.users.get_all_users_controller import get_all_users_data
-
+from controllers.users.get_user_activities_controller import get_user_activities
 
 user_routes = Blueprint('user_routes', __name__)
 
@@ -77,12 +77,21 @@ def login():
 @user_routes.route('/user', methods=['GET'])
 @token_required
 def get_authenticated_user():
-    # El usuario autenticado está disponible en request.user gracias al middleware
-    user_id = request.user['iduser']
-    
-    # Obtener la información del usuario llamando al controlador
-    result, status_code = get_user_data(user_id)
-    return jsonify(result), status_code
+    try:
+        # El usuario autenticado está disponible en request.user gracias al middleware
+        user_id = request.user['iduser']
+        
+        # Obtener la información del usuario llamando al controlador
+        result, status_code = get_user_data(user_id)
+        
+        if status_code == 200:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), status_code
+            
+    except Exception as e:
+        print(f"Error en get_authenticated_user: {str(e)}")
+        return jsonify({"message": f"Error interno del servidor: {str(e)}"}), 500
 
 # ruta para actualizar usuarios a los que pertenece el token
 @user_routes.route('/user/update', methods=['PUT'])
@@ -100,6 +109,16 @@ def update_user_route():
     # Llamar al controlador para actualizar al usuario
     result, status_code = update_user(user_id, data)
     return jsonify(result), status_code
+
+# Ruta para obtener las actividades del usuario autenticado
+@user_routes.route('/user/activities', methods=['GET'])
+@token_required
+def get_user_activities_route():
+    user_data = request.user  # Datos del token decodificado
+    user_id = user_data["iduser"]  # ID del usuario autenticado
+    
+    # Llamar al controlador para obtener las actividades
+    return get_user_activities(user_id)
 
 # Ruta para ver todos los usuarios
 @user_routes.route('/allUsers', methods=['GET'])
