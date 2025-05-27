@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from middlewares.auth import token_required
+from middlewares.auth import token_required  # Asegúrate de que sea así
 from controllers.users.register_controller import create_user
 from controllers.users.login_controller import login_user
 from controllers.users.get_user_controller import get_user_data
@@ -114,11 +114,19 @@ def update_user_route():
 @user_routes.route('/user/activities', methods=['GET'])
 @token_required
 def get_user_activities_route():
-    user_data = request.user  # Datos del token decodificado
-    user_id = user_data["iduser"]  # ID del usuario autenticado
-    
-    # Llamar al controlador para obtener las actividades
-    return get_user_activities(user_id)
+    """Obtiene las actividades del usuario, opcionalmente filtradas por semestre"""
+    try:
+        # Obtener el ID del usuario desde el token decodificado (igual que en otras rutas)
+        user_id = request.user['iduser']
+        
+        # Llamar al controlador
+        return get_user_activities(user_id)
+        
+    except KeyError:
+        return jsonify({"error": "No se pudo obtener la información del usuario del token"}), 401
+    except Exception as e:
+        print(f"Error en get_user_activities_route: {str(e)}")
+        return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
 
 # Ruta para ver todos los usuarios
 @user_routes.route('/allUsers', methods=['GET'])

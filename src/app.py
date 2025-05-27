@@ -1,15 +1,18 @@
 import os
 from flask import Flask
+from flask_cors import CORS
 from db.connection import db, create_db_uri
 from routes.user_routes import user_routes
+from routes.activities_routes import activities_routes
+from routes.semesters import semester_routes  # Nueva importación
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.inactive_users import mark_inactive_users
 from routes.research_hotbed_routes import research_hotbed_routes
 from routes.user_research_hotbed_routes import users_research_hotbed_routes
-from routes.activities_routes import activities_routes
 
 def create_app():
     app = Flask(__name__) 
+    CORS(app)
 
     # Configuración de la base de datos
     app.config['SQLALCHEMY_DATABASE_URI'] = create_db_uri()
@@ -21,9 +24,10 @@ def create_app():
 
     # Registro de rutas
     app.register_blueprint(user_routes)  # Rutas de usuarios
+    app.register_blueprint(activities_routes)  # Rutas de actividades
+    app.register_blueprint(semester_routes)  # Nueva ruta
     app.register_blueprint(research_hotbed_routes)  # Rutas de semilleros
     app.register_blueprint(users_research_hotbed_routes) # Rutas de los usuarios que pertenecen a un semillero
-    app.register_blueprint(activities_routes)  # Rutas de actividades
 
     # Inicialización de APScheduler
     scheduler = BackgroundScheduler()
@@ -39,4 +43,4 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     port = os.getenv('FLASK_APP_PORT', 5000)
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)

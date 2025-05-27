@@ -6,6 +6,7 @@ from models.recognitions_researchHotbed import RecognitionsResearchHotbed
 from models.activities_researchHotbed import ActivitiesResearchHotbed
 from models.activity_authors import ActivityAuthors
 from models.users_research_hotbed import UsersResearchHotbed
+from utils.semester_utils import get_current_semester
 from db.connection import db
 
 def register_activity(data):
@@ -30,13 +31,16 @@ def register_activity(data):
             if user_id not in valid_user_ids:
                 return jsonify({"error": f"El usuario con ID {user_id} no pertenece a ningún semillero"}), 400
 
+        # Obtener el semestre (puede venir del frontend o calcularlo automáticamente)
+        semester = data.get('semester', get_current_semester())
+
         # Registrar el proyecto si se incluye en los datos
         project_id = None
         if 'project' in data and data['project']:
             project_data = data['project']
             co_researchers = project_data.get('co_researchers', '')
             if co_researchers:
-                co_researchers = ', '.join(co_researchers.split(','))
+                co_researchers = ', '.join([name.strip() for name in co_researchers.split(',')])
                 
             project = ProjectsResearchHotbed(
                 name_projectsResearchHotbed=project_data['name'],
@@ -78,8 +82,7 @@ def register_activity(data):
             db.session.flush()
             recognition_id = recognition.idrecognitionsResearchHotbed
 
-        # Registrar la actividad SIN asociarla al creador automáticamente
-        # Usamos el primer autor como responsable en la relación usersResearchHotbed
+        # Obtener el usersResearchHotbed del primer autor
         main_author_research_hotbed = UsersResearchHotbed.query.filter_by(
             user_iduser=authors_ids[0]
         ).first()
@@ -87,6 +90,7 @@ def register_activity(data):
         if not main_author_research_hotbed:
             return jsonify({"error": "El autor principal no pertenece a ningún semillero"}), 400
 
+        # Registrar la actividad
         activity = ActivitiesResearchHotbed(
             title_activitiesResearchHotbed=data['title'],
             responsible_activitiesResearchHotbed=data['responsible'],
@@ -97,14 +101,15 @@ def register_activity(data):
             endTime_activitiesResearchHotbed=datetime.strptime(data['end_time'], '%H:%M').time() if data.get('end_time') else None,
             duration_activitiesResearchHotbed=data.get('duration'),
             approvedFreeHours_activitiesResearchHotbed=data.get('approved_free_hours'),
-            usersResearchHotbed_idusersResearchHotbed=main_author_research_hotbed.idusersResearchHotbed,  # Solo para mantener la referencia
+            semester=semester,
+            usersResearchHotbed_idusersResearchHotbed=main_author_research_hotbed.idusersResearchHotbed,
             projectsResearchHotbed_idprojectsResearchHotbed=project_id,
             productsResearchHotbed_idproductsResearchHotbed=product_id,
             recognitionsResearchHotbed_idrecognitionsResearchHotbed=recognition_id
         )
 
         db.session.add(activity)
-        db.session.flush()  # Para obtener el ID de la actividad
+        db.session.flush()
 
         # Crear las relaciones de autoría
         # Agregar autores principales
@@ -140,6 +145,7 @@ def register_activity(data):
         return jsonify({
             "message": "Actividad registrada exitosamente",
             "activity_id": activity.idactivitiesResearchHotbed,
+            "semester": semester,
             "authors_count": len(authors_ids),
             "co_authors_count": len(co_authors_ids)
         }), 201
