@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from controllers.user_ResearchHotbed.add_user_research_hotbed_controller import add_user_to_research_hotbed
 from middlewares.auth import token_required
 from controllers.user_ResearchHotbed.get_users_research_hotbed_controller import get_users_by_research_hotbed
@@ -19,7 +19,21 @@ def add_user_to_research_hotbed_route(research_hotbed_id, user_id):
 @users_research_hotbed_routes.route("/get/user-research-hotbeds/<int:research_hotbed_id>/users", methods=["GET"])
 @token_required
 def get_users_by_research_hotbed_route(research_hotbed_id):
-    return get_users_by_research_hotbed(research_hotbed_id)
+    try:
+        result, status_code = get_users_by_research_hotbed(research_hotbed_id)
+        return jsonify(result), status_code
+    except Exception as e:
+        return jsonify({"message": f"Error interno del servidor: {str(e)}"}), 500
+
+# Ruta legacy para compatibilidad (AGREGAR ESTA)
+@users_research_hotbed_routes.route("/getUsersByResearchHotbed/<int:research_hotbed_id>", methods=["GET"])
+@token_required
+def get_users_by_research_hotbed_legacy_route(research_hotbed_id):
+    try:
+        result, status_code = get_users_by_research_hotbed(research_hotbed_id)
+        return jsonify(result), status_code
+    except Exception as e:
+        return jsonify({"message": f"Error interno del servidor: {str(e)}"}), 500
 
 # Ruta para actualizar usuarios que pertenecen a un semillero
 @users_research_hotbed_routes.route("/update/users-research-hotbeds/<int:user_research_hotbed_id>", methods=["PUT"])
