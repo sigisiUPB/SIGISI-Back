@@ -5,15 +5,19 @@ class ActivitiesResearchHotbed(db.Model):
 
     idactivitiesResearchHotbed = db.Column(db.Integer, primary_key=True)
     title_activitiesResearchHotbed = db.Column(db.String(125), nullable=False)
-    responsible_activitiesResearchHotbed = db.Column(db.String(125), nullable=False)
+    responsible_activitiesResearchHotbed = db.Column(db.String(125), nullable=True)
     date_activitiesResearchHotbed = db.Column(db.Date, nullable=False)
-    description_activitiesResearchHotbed = db.Column(db.Text, nullable=False)  # Cambiado a TEXT
+    description_activitiesResearchHotbed = db.Column(db.Text, nullable=False)
     type_activitiesResearchHotbed = db.Column(db.String(45), nullable=False)
+    category = db.Column(db.String(50), nullable=False, default='general')
+    reference_number = db.Column(db.String(125), nullable=True)
+    publication_date = db.Column(db.Date, nullable=True)
+    organization_name = db.Column(db.String(125), nullable=True)
     startTime_activitiesResearchHotbed = db.Column(db.Time, nullable=True)
     endTime_activitiesResearchHotbed = db.Column(db.Time, nullable=True)
     duration_activitiesResearchHotbed = db.Column(db.Float, nullable=True)
-    approvedFreeHours_activitiesResearchHotbed = db.Column(db.Boolean, nullable=True)
-    semester = db.Column(db.String(20), nullable=False, default='semestre-1-2025')  # Nuevo campo
+    approvedFreeHours_activitiesResearchHotbed = db.Column(db.Float, nullable=True)
+    semester = db.Column(db.String(20), nullable=False, default='semestre-1-2025')
 
     usersResearchHotbed_idusersResearchHotbed = db.Column(
         db.Integer, 
@@ -38,3 +42,6 @@ class ActivitiesResearchHotbed(db.Model):
         db.ForeignKey('recognitionsResearchHotbed.idrecognitionsResearchHotbed'),
         nullable=True
     )
+
+    def __repr__(self):
+        return f'<ActivitiesResearchHotbed {self.idactivitiesResearchHotbed}>'
