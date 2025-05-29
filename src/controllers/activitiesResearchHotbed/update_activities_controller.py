@@ -34,6 +34,7 @@ def update_activity(activity_id, data):
                 db.session.flush()
                 activity.projectsResearchHotbed_idprojectsResearchHotbed = project.idprojectsResearchHotbed
 
+            # Actualizar todos los campos incluyendo name
             project.name_projectsResearchHotbed = data['project'].get('name', project.name_projectsResearchHotbed)
             project.referenceNumber_projectsResearchHotbed = data['project'].get('reference_number', project.referenceNumber_projectsResearchHotbed)
             if data['project'].get('start_date'):
@@ -41,7 +42,6 @@ def update_activity(activity_id, data):
             if data['project'].get('end_date'):
                 project.endDate_projectsResearchHotbed = datetime.strptime(data['project']['end_date'], '%Y-%m-%d')
             project.principalResearcher_projectsResearchHotbed = data['project'].get('principal_researcher', project.principalResearcher_projectsResearchHotbed)
-            project.coResearchers_projectsResearchHotbed = data['project'].get('co_researchers', project.coResearchers_projectsResearchHotbed)
 
         # Si hay un producto asociado
         if 'product' in data:
@@ -69,7 +69,7 @@ def update_activity(activity_id, data):
                 db.session.flush()
                 activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed = recognition.idrecognitionsResearchHotbed
 
-            recognition.name_recognitionsResearchHotbed = data['recognition'].get('name', recognition.name_recognitionsResearchHotbed)
+            # Eliminar la línea que causa error: name_recognitionsResearchHotbed no se usa en el frontend
             recognition.projectName_recognitionsResearchHotbed = data['recognition'].get('project_name', recognition.projectName_recognitionsResearchHotbed)
             recognition.participantsNames_recognitionsResearchHotbed = data['recognition'].get('participants_names', recognition.participantsNames_recognitionsResearchHotbed)
             recognition.organizationName_recognitionsResearchHotbed = data['recognition'].get('organization_name', recognition.organizationName_recognitionsResearchHotbed)
