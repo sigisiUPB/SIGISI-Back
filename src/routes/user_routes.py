@@ -110,13 +110,13 @@ def update_user_route():
     result, status_code = update_user(user_id, data)
     return jsonify(result), status_code
 
-# Ruta para obtener las actividades del usuario autenticado
+# Ruta para obtener las actividades del usuario autenticado (unificada)
 @user_routes.route('/user/activities', methods=['GET'])
 @token_required
 def get_user_activities_route():
     """Obtiene las actividades del usuario, opcionalmente filtradas por semestre"""
     try:
-        # Obtener el ID del usuario desde el token decodificado (igual que en otras rutas)
+        # Obtener el ID del usuario desde el token decodificado
         user_id = request.user['iduser']
         
         # Llamar al controlador
@@ -148,3 +148,14 @@ def update_anyUser_route(user_id):
     # Llamar al controlador de actualización con el user_id proporcionado
     result, status_code = update_user(user_id, data)
     return jsonify(result), status_code
+
+# Agregar esta nueva ruta al archivo existente (ya tienes una similar, pero necesitas actualizarla):
+@user_routes.route('/getUserActivities', methods=['GET'])
+@token_required
+def get_user_activities_route_profile():
+    """Obtiene las actividades del usuario para el perfil"""
+    try:
+        user_id = request.user['iduser']
+        return get_user_activities(user_id)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
