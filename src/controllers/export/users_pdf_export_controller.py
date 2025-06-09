@@ -321,22 +321,101 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
     
     if research_hotbeds:
         hotbeds_data = [['Semillero', 'Acrónimo', 'Facultad', 'Rol', 'Estado', 'Ingreso']]
+        
+        # Calcular el ancho máximo necesario para cada columna
+        max_name_length = 0
+        max_faculty_length = 0
+        max_role_length = 0
+        
         for hotbed in research_hotbeds:
-            name = hotbed['name'][:25] + '...' if len(hotbed['name']) > 25 else hotbed['name']
-            faculty = hotbed['faculty'][:15] + '...' if len(hotbed['faculty']) > 15 else hotbed['faculty']
-            role = hotbed['type'][:10] + '...' if len(hotbed['type']) > 10 else hotbed['type']
-            
+            max_name_length = max(max_name_length, len(hotbed['name']))
+            max_faculty_length = max(max_faculty_length, len(hotbed['faculty']))
+            max_role_length = max(max_role_length, len(hotbed['type']))
+        
+        # Agregar datos sin truncar
+        for hotbed in research_hotbeds:
             hotbeds_data.append([
-                name,
+                hotbed['name'],  # Texto completo
                 hotbed['acronym'],
-                faculty,
-                role,
+                hotbed['faculty'],  # Texto completo
+                hotbed['type'],  # Texto completo
                 hotbed['status'],
                 hotbed['dateEnter'].strftime('%m/%Y') if hotbed['dateEnter'] else 'N/A'
             ])
         
-        hotbeds_table = Table(hotbeds_data, colWidths=[1.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 0.8*inch, 0.6*inch])
-        hotbeds_table.setStyle(get_standard_table_style())
+        # Calcular anchos de columna dinámicamente
+        available_width = 6.5 * inch  # Ancho total disponible
+        
+        # Anchos mínimos y fijos para algunas columnas
+        acronym_width = 0.8 * inch
+        status_width = 0.8 * inch
+        date_width = 0.7 * inch
+        
+        # Ancho restante para las columnas variables
+        remaining_width = available_width - acronym_width - status_width - date_width
+        
+        # Distribución proporcional basada en contenido
+        total_chars = max_name_length + max_faculty_length + max_role_length
+        
+        if total_chars > 0:
+            name_ratio = max_name_length / total_chars
+            faculty_ratio = max_faculty_length / total_chars
+            role_ratio = max_role_length / total_chars
+            
+            # Asegurar anchos mínimos
+            name_width = max(1.5 * inch, remaining_width * name_ratio)
+            faculty_width = max(1.2 * inch, remaining_width * faculty_ratio)
+            role_width = max(0.8 * inch, remaining_width * role_ratio)
+            
+            # Ajustar si excede el ancho disponible
+            total_calc = name_width + faculty_width + role_width
+            if total_calc > remaining_width:
+                scale_factor = remaining_width / total_calc
+                name_width *= scale_factor
+                faculty_width *= scale_factor
+                role_width *= scale_factor
+        else:
+            # Valores por defecto si no hay datos
+            name_width = 2.0 * inch
+            faculty_width = 1.5 * inch
+            role_width = 1.0 * inch
+        
+        col_widths = [name_width, acronym_width, faculty_width, role_width, status_width, date_width]
+        
+        hotbeds_table = Table(hotbeds_data, colWidths=col_widths)
+        
+        # Estilo especial para tabla responsive
+        responsive_table_style = TableStyle([
+            # Header - Rosa/Morado degradado
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d946ef')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Fuente más pequeña para header
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            
+            # Body
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fdf2f8')),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),  # Fuente más pequeña para contenido
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#f3e8ff')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            
+            # Alineación específica para columnas pequeñas
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Acrónimo centrado
+            ('ALIGN', (4, 0), (4, -1), 'CENTER'),  # Estado centrado
+            ('ALIGN', (5, 0), (5, -1), 'CENTER'),  # Fecha centrada
+            
+            # Permitir salto de línea en texto largo
+            ('WORDWRAP', (0, 0), (-1, -1), True),
+        ])
+        
+        hotbeds_table.setStyle(responsive_table_style)
         story.append(hotbeds_table)
     else:
         no_hotbeds = Paragraph("No está asociado a ningún semillero de investigación.", std_styles['normal'])
