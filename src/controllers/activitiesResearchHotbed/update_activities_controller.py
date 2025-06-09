@@ -6,6 +6,9 @@ from models.recognitions_researchHotbed import RecognitionsResearchHotbed
 from db.connection import db
 from datetime import datetime
 
+from models.users import User
+from models.users_research_hotbed import UsersResearchHotbed
+
 def update_activity(activity_id, data):
     try:
         # Buscar la actividad existente

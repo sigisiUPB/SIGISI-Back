@@ -6,7 +6,6 @@ from routes.user_routes import user_routes
 from routes.activities_routes import activities_routes
 from routes.semesters import semester_routes
 from routes.export_routes import export_routes
-from routes.dashboard_routes import dashboard_routes  # AGREGAR ESTA LÍNEA
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.inactive_users import mark_inactive_users
 from routes.research_hotbed_routes import research_hotbed_routes
@@ -31,7 +30,6 @@ def create_app():
     app.register_blueprint(research_hotbed_routes)
     app.register_blueprint(users_research_hotbed_routes)
     app.register_blueprint(export_routes)
-    app.register_blueprint(dashboard_routes)  # AGREGAR ESTA LÍNEA
 
     # Inicialización de APScheduler
     scheduler = BackgroundScheduler()
