@@ -1,15 +1,15 @@
 from flask import Blueprint, request, jsonify
 from middlewares.auth import token_required
-from controllers.export.pdf_export_controller import export_research_hotbed_pdf
-from controllers.export.users_pdf_export_controller import export_user_pdf, export_multiple_users_pdf
+from controllers.export.excel_export_controller import export_research_hotbed_excel
+from controllers.export.users_pdf_export_controller import export_user_excel, export_multiple_users_excel
 
 export_routes = Blueprint('export_routes', __name__)
 
-@export_routes.route('/export/research-hotbed/<int:research_hotbed_id>/pdf', methods=['GET'])
+@export_routes.route('/export/research-hotbed/<int:research_hotbed_id>/excel', methods=['GET'])
 @token_required
-def export_research_hotbed_pdf_route(research_hotbed_id):
+def export_research_hotbed_excel_route(research_hotbed_id):
     """
-    Exporta un PDF completo del semillero para el semestre especificado
+    Exporta un archivo Excel completo del semillero para el semestre especificado
     """
     try:
         semester = request.args.get('semester')
@@ -17,16 +17,16 @@ def export_research_hotbed_pdf_route(research_hotbed_id):
         if not semester:
             return jsonify({"error": "Parámetro 'semester' requerido"}), 400
             
-        return export_research_hotbed_pdf(research_hotbed_id, semester)
+        return export_research_hotbed_excel(research_hotbed_id, semester)
         
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-@export_routes.route('/export/user/<int:user_id>/pdf', methods=['GET'])
+@export_routes.route('/export/user/<int:user_id>/excel', methods=['GET'])
 @token_required
-def export_user_pdf_route(user_id):
+def export_user_excel_route(user_id):
     """
-    Exporta un PDF individual del usuario para el semestre especificado
+    Exporta un archivo Excel individual del usuario para el semestre especificado
     Query parameters:
     - semester: formato 'semestre-1-2025'
     """
@@ -36,16 +36,16 @@ def export_user_pdf_route(user_id):
         if not semester:
             return jsonify({"error": "Parámetro 'semester' requerido"}), 400
             
-        return export_user_pdf(user_id, semester)
+        return export_user_excel(user_id, semester)
         
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-@export_routes.route('/export/users/pdf', methods=['POST'])
+@export_routes.route('/export/users/excel', methods=['POST'])
 @token_required
-def export_multiple_users_pdf_route():
+def export_multiple_users_excel_route():
     """
-    Exporta un PDF consolidado con múltiples usuarios
+    Exporta un archivo Excel consolidado con múltiples usuarios
     Body JSON:
     {
         "user_ids": [1, 2, 3],
@@ -67,7 +67,7 @@ def export_multiple_users_pdf_route():
         if not semester:
             return jsonify({"error": "Parámetro 'semester' requerido"}), 400
             
-        return export_multiple_users_pdf(user_ids, semester)
+        return export_multiple_users_excel(user_ids, semester)
         
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
@@ -76,7 +76,7 @@ def export_multiple_users_pdf_route():
 @token_required
 def preview_user_export_data_route(user_id):
     """
-    Previsualiza los datos que se incluirán en el PDF del usuario
+    Previsualiza los datos que se incluirán en el Excel del usuario
     """
     try:
         semester = request.args.get('semester')
@@ -115,3 +115,16 @@ def preview_user_export_data_route(user_id):
         
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+# Rutas de compatibilidad (alias)
+@export_routes.route('/export/user/<int:user_id>/pdf', methods=['GET'])
+@token_required
+def export_user_pdf_route(user_id):
+    """Alias para compatibilidad - redirige a Excel"""
+    return export_user_excel_route(user_id)
+
+@export_routes.route('/export/users/pdf', methods=['POST'])
+@token_required
+def export_multiple_users_pdf_route():
+    """Alias para compatibilidad - redirige a Excel"""
+    return export_multiple_users_excel_route()
