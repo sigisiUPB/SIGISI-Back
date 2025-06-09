@@ -68,3 +68,21 @@ def format_semester_label(semester):
         pass
     
     return semester
+
+def format_semester_label_detailed(semester):
+    """
+    Convierte formato 'semestre-1-2025' a 'Primer Semestre 2025'
+    Para uso en el PDF con formato más descriptivo
+    """
+    try:
+        parts = semester.split('-')
+        if len(parts) != 3:
+            return semester
+            
+        semester_num = int(parts[1])
+        year = parts[2]
+        
+        semester_name = "Primer" if semester_num == 1 else "Segundo"
+        return f"{semester_name} Semestre {year}"
+    except:
+        return semester

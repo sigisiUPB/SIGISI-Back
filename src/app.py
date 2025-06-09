@@ -5,6 +5,7 @@ from db.connection import db, create_db_uri
 from routes.user_routes import user_routes
 from routes.activities_routes import activities_routes
 from routes.semesters import semester_routes
+from routes.export_routes import export_routes  # Agregar esta línea
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.inactive_users import mark_inactive_users
 from routes.research_hotbed_routes import research_hotbed_routes
@@ -24,10 +25,11 @@ def create_app():
 
     # Registro de rutas
     app.register_blueprint(user_routes)
-    app.register_blueprint(activities_routes)  # Corregido
+    app.register_blueprint(activities_routes)
     app.register_blueprint(semester_routes)
     app.register_blueprint(research_hotbed_routes)
     app.register_blueprint(users_research_hotbed_routes)
+    app.register_blueprint(export_routes)  # Agregar esta línea
 
     # Inicialización de APScheduler
     scheduler = BackgroundScheduler()
