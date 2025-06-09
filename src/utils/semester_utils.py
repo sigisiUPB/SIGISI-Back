@@ -34,25 +34,34 @@ def get_available_semesters(start_year=2024, future_years=2):
 def is_valid_semester(semester):
     """
     Valida si un semestre tiene el formato correcto y está en el rango válido.
+    Acepta semestres desde el inicio del sistema (2024) hasta años futuros razonables.
     """
     try:
         parts = semester.split('-')
         if len(parts) != 3:
             return False
         
-        _, sem_num, year = parts
+        prefix, sem_num, year = parts
         
-        # Validar formato
+        # Validar formato exacto
+        if prefix != "semestre":
+            return False
+            
         if not (sem_num in ['1', '2'] and year.isdigit()):
             return False
         
-        # Validar rango de años (desde 2024 hasta año actual + 5)
+        # Validar rango de años - más escalable
         year_int = int(year)
         current_year = datetime.now().year
         
-        return 2024 <= year_int <= current_year + 5
+        # Desde el año de inicio del sistema hasta +20 años en el futuro
+        # Esto permite planificación a muy largo plazo
+        min_year = 2024  # Año de inicio del sistema
+        max_year = current_year + 20  # Suficiente para planificación universitaria
         
-    except:
+        return min_year <= year_int <= max_year
+        
+    except (ValueError, IndexError):
         return False
 
 def format_semester_label(semester):
@@ -86,3 +95,39 @@ def format_semester_label_detailed(semester):
         return f"{semester_name} Semestre {year}"
     except:
         return semester
+
+def is_semester_in_past(semester):
+    """
+    Función adicional para verificar si un semestre ya pasó.
+    Útil para validaciones específicas de negocio.
+    """
+    try:
+        current_semester = get_current_semester()
+        current_parts = current_semester.split('-')
+        semester_parts = semester.split('-')
+        
+        if len(current_parts) != 3 or len(semester_parts) != 3:
+            return False
+            
+        current_year = int(current_parts[2])
+        current_sem = int(current_parts[1])
+        
+        check_year = int(semester_parts[2])
+        check_sem = int(semester_parts[1])
+        
+        if check_year < current_year:
+            return True
+        elif check_year == current_year and check_sem < current_sem:
+            return True
+        else:
+            return False
+            
+    except (ValueError, IndexError):
+        return False
+
+def is_semester_current_or_future(semester):
+    """
+    Función adicional para verificar si un semestre es actual o futuro.
+    Útil para validar que se puedan crear actividades solo en semestres actuales/futuros.
+    """
+    return is_valid_semester(semester) and not is_semester_in_past(semester)
