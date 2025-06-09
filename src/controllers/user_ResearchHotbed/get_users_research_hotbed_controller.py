@@ -6,7 +6,7 @@ from db.connection import db
 
 def get_users_by_research_hotbed(research_hotbed_id):
     """
-    Obtiene todos los usuarios asociados a un semillero específico.
+    Obtiene TODOS los usuarios asociados a un semillero específico (activos e inactivos).
     :param research_hotbed_id: ID del semillero de investigación.
     :return: Lista de usuarios o mensaje de error.
     """
@@ -16,15 +16,19 @@ def get_users_by_research_hotbed(research_hotbed_id):
         if not research_hotbed:
             return {"message": "Semillero de investigación no encontrado"}, 404
 
-        # Obtener los usuarios asociados al semillero con INNER JOIN
+        # CORREGIR: Obtener TODOS los usuarios asociados al semillero (activos e inactivos)
         users_query = db.session.query(User, UsersResearchHotbed)\
             .join(UsersResearchHotbed, User.iduser == UsersResearchHotbed.user_iduser)\
             .filter(UsersResearchHotbed.researchHotbed_idresearchHotbed == research_hotbed_id)\
-            .filter(UsersResearchHotbed.status_usersResearchHotbed == 'Activo')\
+            .order_by(
+                # Activos primero, luego inactivos
+                (UsersResearchHotbed.status_usersResearchHotbed == 'Activo').desc(),
+                User.name_user.asc()
+            )\
             .all()
 
         if not users_query:
-            return {"message": "No se encontraron usuarios activos en este semillero"}, 404
+            return {"message": "No se encontraron usuarios en este semillero"}, 404
 
         # Formatear la respuesta
         users_list = []

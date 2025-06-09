@@ -162,13 +162,18 @@ def export_research_hotbed_pdf(research_hotbed_id, semester):
         return jsonify({"error": f"Error generando PDF: {str(e)}"}), 500
 
 def get_active_members(research_hotbed_id):
-    """Obtiene miembros activos del semillero"""
+    """Obtiene TODOS los miembros del semillero (activos e inactivos)"""
     try:
+        # CAMBIO: Eliminar filtro de status para mostrar todos los miembros
         members_query = db.session.query(User, UsersResearchHotbed).join(
             UsersResearchHotbed, User.iduser == UsersResearchHotbed.user_iduser
         ).filter(
-            UsersResearchHotbed.researchHotbed_idresearchHotbed == research_hotbed_id,
-            UsersResearchHotbed.status_usersResearchHotbed == 'Activo'
+            UsersResearchHotbed.researchHotbed_idresearchHotbed == research_hotbed_id
+            # Removido: UsersResearchHotbed.status_usersResearchHotbed == 'Activo'
+        ).order_by(
+            # Activos primero (Activo = 1, otros = 0), luego alfabético
+            (UsersResearchHotbed.status_usersResearchHotbed == 'Activo').desc(),
+            User.name_user.asc()
         ).all()
         
         return [{
@@ -177,6 +182,8 @@ def get_active_members(research_hotbed_id):
             'idSigaa': user.idSigaa_user,
             'type': user_research.TypeUser_usersResearchHotbed,
             'dateEnter': user_research.dateEnter_usersResearchHotbed,
+            'dateExit': user_research.dateExit_usersResearchHotbed,  # Campo que SÍ existe
+            'observation': user_research.observation_usersResearchHotbed,  # Usar observation en lugar de exitReason
             'status': user_research.status_usersResearchHotbed
         } for user, user_research in members_query]
         
@@ -349,16 +356,19 @@ def generate_pdf_report(research_hotbed, members, activities, semester):
     story.append(info_table)
     story.append(Spacer(1, 20))
     
-    # Resumen estadístico
+    # Resumen estadístico - ACTUALIZADO para mostrar activos e inactivos
     story.append(Paragraph("RESUMEN ESTADÍSTICO", std_styles['heading']))
     
+    # Usar el mismo criterio de filtrado que en la tabla
     active_members = [m for m in members if m['status'] == 'Activo']
+    inactive_members = [m for m in members if m['status'] != 'Activo']
     total_hours = sum(a['duration'] for a in activities)
     approved_activities = len([a for a in activities if a['approved_free_hours']])
     
     stats_data = [
-        ['Miembros activos', str(len(active_members)), 'Horas totales', f'{total_hours}h'],
-        ['Total actividades', str(len(activities)), 'Horas aprobadas', str(approved_activities)],
+        ['Total miembros', str(len(members)), 'Miembros activos', str(len(active_members))],
+        ['Miembros inactivos', str(len(inactive_members)), 'Horas totales', f'{total_hours}h'],
+        ['Total actividades', str(len(activities)), 'Actividades aprobadas', str(approved_activities)],
         ['Proyectos', str(len([a for a in activities if 'proyecto' in a['type'].lower()])), 'Productos', str(len([a for a in activities if 'producto' in a['type'].lower()]))],
         ['Reconocimientos', str(len([a for a in activities if 'reconocimiento' in a['type'].lower()])), 'Pendientes', str(len(activities) - approved_activities)]
     ]
@@ -368,26 +378,65 @@ def generate_pdf_report(research_hotbed, members, activities, semester):
     story.append(stats_table)
     story.append(Spacer(1, 20))
     
-    # Tabla de miembros
+    # Tabla de miembros - MOSTRAR TODOS CON STATUS, FECHA DE SALIDA Y OBSERVACIÓN
     story.append(Paragraph("MIEMBROS DEL SEMILLERO", std_styles['heading']))
     
-    if active_members:
-        members_data = [['Nombre', 'ID SIGAA', 'Tipo', 'Fecha Ingreso']]
-        for member in active_members:
-            name = member['name'][:25] + '...' if len(member['name']) > 25 else member['name']
-            type_user = member['type'][:12] + '...' if len(member['type']) > 12 else member['type']
+    if members:
+        # Separar activos e inactivos para mostrar activos primero
+        active_members = [m for m in members if m['status'] == 'Activo']
+        inactive_members = [m for m in members if m['status'] != 'Activo']
+        sorted_members = active_members + inactive_members
+        
+        # Incluir columnas para fecha de salida y observación
+        members_data = [['Nombre', 'ID SIGAA', 'Tipo', 'Estado', 'F. Ingreso', 'F. Salida', 'Observación']]
+        
+        for member in sorted_members:
+            name = member['name'][:18] + '...' if len(member['name']) > 18 else member['name']
+            type_user = member['type'][:8] + '...' if len(member['type']) > 8 else member['type']
+            
+            # Formatear fechas
+            date_enter = member['dateEnter'].strftime('%m/%Y') if member['dateEnter'] else 'N/A'
+            date_exit = member['dateExit'].strftime('%m/%Y') if member['dateExit'] else '-'
+            
+            # Formatear observación
+            observation = ''
+            if member['observation']:
+                observation = member['observation'][:12] + '...' if len(member['observation']) > 12 else member['observation']
+            else:
+                observation = '-' if member['status'] == 'Activo' else 'Sin observación'
+            
             members_data.append([
                 name,
                 member['idSigaa'] or 'N/A',
                 type_user,
-                member['dateEnter'].strftime('%d/%m/%Y') if member['dateEnter'] else 'N/A'
+                member['status'],
+                date_enter,
+                date_exit,
+                observation
             ])
         
-        members_table = Table(members_data, colWidths=[2.2*inch, 1.2*inch, 1.3*inch, 1.3*inch])
-        members_table.setStyle(get_standard_table_style())
+        # Ajustar anchos de columna para incluir nuevos campos
+        # Reducir algunos anchos para hacer espacio para fecha de salida y observación
+        members_table = Table(members_data, colWidths=[1.4*inch, 0.8*inch, 0.8*inch, 0.6*inch, 0.6*inch, 0.6*inch, 1.0*inch])
+        
+        # Estilo con colores diferentes para activos/inactivos
+        table_style = get_standard_table_style()
+        
+        # Agregar colores especiales para miembros inactivos
+        for row_idx, member in enumerate(sorted_members, 1):  # Saltar header, empezar desde 1
+            if member['status'] != 'Activo':  # Si no es activo
+                table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#fee2e2'))  # Fondo rojo claro
+                table_style.add('TEXTCOLOR', (0, row_idx), (-1, row_idx), colors.HexColor('#7f1d1d'))  # Texto rojo oscuro
+        
+        # Ajustar alineación para las columnas de fecha
+        table_style.add('ALIGN', (4, 0), (5, -1), 'CENTER')  # Centrar fechas
+        table_style.add('FONTSIZE', (0, 0), (-1, -1), 7)  # Reducir tamaño de fuente para que quepa todo
+        
+        members_table.setStyle(table_style)
         story.append(members_table)
+        
     else:
-        story.append(Paragraph("No se encontraron miembros activos.", std_styles['normal']))
+        story.append(Paragraph("No se encontraron miembros en este semillero.", std_styles['normal']))
     
     story.append(PageBreak())
     
