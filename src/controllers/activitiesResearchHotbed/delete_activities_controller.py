@@ -11,7 +11,7 @@ def delete_activity(activity_id):
         # Buscar la actividad existente
         activity = ActivitiesResearchHotbed.query.get(activity_id)
         if not activity:
-            return jsonify({"message": "Actividad no encontrada"}), 404
+            return jsonify({"message": "Informe no encontrado"}), 404
 
         # Eliminar las relaciones de autoría primero
         ActivityAuthors.query.filter_by(activity_id=activity_id).delete()
@@ -36,7 +36,7 @@ def delete_activity(activity_id):
         db.session.delete(activity)
         db.session.commit()
 
-        return jsonify({"message": "Actividad eliminada correctamente"}), 200
+        return jsonify({"message": "Informe eliminado correctamente"}), 200
 
     except Exception as e:
         db.session.rollback()
