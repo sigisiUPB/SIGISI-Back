@@ -108,111 +108,93 @@ def get_user_research_hotbeds(user_id):
         return []
 
 def get_user_activities_by_semester(user_id, semester):
-    """Obtiene actividades del usuario filtradas por semestre con TODOS los datos completos"""
+    """Obtiene actividades del usuario filtradas por semestre usando el campo 'semester'"""
     try:
-        # Extraer año y número de semestre
-        semester_parts = semester.split('-')
-        if len(semester_parts) != 3:
-            return []
-            
-        semester_number = int(semester_parts[1])
-        year = int(semester_parts[2])
-        
         # Obtener IDs de semilleros del usuario
         user_research_ids = db.session.query(UsersResearchHotbed.idusersResearchHotbed).filter(
             UsersResearchHotbed.user_iduser == user_id
         ).subquery()
         
-        # Consulta base de actividades
+        # Consulta base de actividades filtradas por el campo semester
         activities_query = db.session.query(ActivitiesResearchHotbed).filter(
-            ActivitiesResearchHotbed.usersResearchHotbed_idusersResearchHotbed.in_(user_research_ids)
+            ActivitiesResearchHotbed.usersResearchHotbed_idusersResearchHotbed.in_(user_research_ids),
+            ActivitiesResearchHotbed.semester == semester  # Filtrar por el campo semester
         ).all()
         
-        # Filtrar por semestre
+        # Procesar actividades
         filtered_activities = []
         for activity in activities_query:
-            activity_date = activity.date_activitiesResearchHotbed
-            activity_year = activity_date.year
-            activity_month = activity_date.month
+            # Obtener autores
+            authors_data = get_activity_authors(activity.idactivitiesResearchHotbed)
             
-            # Determinar semestre (1: Enero-Junio, 2: Julio-Diciembre)
-            activity_semester = 1 if activity_month <= 6 else 2
+            # Obtener nombre del semillero
+            research_hotbed_name = get_research_hotbed_name(activity.usersResearchHotbed_idusersResearchHotbed)
             
-            if activity_year == year and activity_semester == semester_number:
-                # Obtener autores
-                authors_data = get_activity_authors(activity.idactivitiesResearchHotbed)
+            activity_data = {
+                'id': activity.idactivitiesResearchHotbed,
+                'title': activity.title_activitiesResearchHotbed,
+                'responsible': activity.responsible_activitiesResearchHotbed,
+                'date': activity.date_activitiesResearchHotbed,
+                'description': activity.description_activitiesResearchHotbed,
+                'type': activity.type_activitiesResearchHotbed,
+                'duration': activity.duration_activitiesResearchHotbed or 0,
+                'start_time': activity.startTime_activitiesResearchHotbed,
+                'end_time': activity.endTime_activitiesResearchHotbed,
+                'approved_free_hours': bool(activity.approvedFreeHours_activitiesResearchHotbed),
+                'reference_number': getattr(activity, 'reference_number', None),
+                'publication_date': getattr(activity, 'publication_date', None),
+                'organization_name': getattr(activity, 'organization_name', None),
+                'authors': authors_data,
+                'research_hotbed_name': research_hotbed_name
+            }
+            
+            # Obtener datos específicos según el tipo - MISMA LÓGICA QUE SEMILLEROS
+            if (activity.type_activitiesResearchHotbed and 
+                activity.type_activitiesResearchHotbed.lower() == 'proyecto' and 
+                activity.projectsResearchHotbed_idprojectsResearchHotbed):
                 
-                # Obtener nombre del semillero
-                research_hotbed_name = get_research_hotbed_name(activity.usersResearchHotbed_idusersResearchHotbed)
+                from models.projects_researchHotbed import ProjectsResearchHotbed
+                project = db.session.query(ProjectsResearchHotbed).filter_by(
+                    idprojectsResearchHotbed=activity.projectsResearchHotbed_idprojectsResearchHotbed
+                ).first()
+                if project:
+                    activity_data['project_data'] = {
+                        'name': project.name_projectsResearchHotbed or 'Sin especificar',
+                        'reference_number': project.referenceNumber_projectsResearchHotbed,
+                        'start_date': project.startDate_projectsResearchHotbed,
+                        'end_date': project.endDate_projectsResearchHotbed
+                    }
+            
+            elif (activity.type_activitiesResearchHotbed and 
+                  activity.type_activitiesResearchHotbed.lower() == 'producto' and 
+                  activity.productsResearchHotbed_idproductsResearchHotbed):
                 
-                activity_data = {
-                    'id': activity.idactivitiesResearchHotbed,
-                    'title': activity.title_activitiesResearchHotbed,
-                    'responsible': activity.responsible_activitiesResearchHotbed,
-                    'date': activity.date_activitiesResearchHotbed,
-                    'description': activity.description_activitiesResearchHotbed,
-                    'type': activity.type_activitiesResearchHotbed,
-                    'category': getattr(activity, 'category', 'General'),
-                    'duration': activity.duration_activitiesResearchHotbed or 0,
-                    'start_time': activity.startTime_activitiesResearchHotbed,
-                    'end_time': activity.endTime_activitiesResearchHotbed,
-                    'approved_free_hours': bool(activity.approvedFreeHours_activitiesResearchHotbed),
-                    'reference_number': getattr(activity, 'reference_number', None),
-                    'publication_date': getattr(activity, 'publication_date', None),
-                    'organization_name': getattr(activity, 'organization_name', None),
-                    'authors': authors_data,
-                    'research_hotbed_name': research_hotbed_name
-                }
+                from models.products_researchHotbed import ProductsResearchHotbed
+                product = db.session.query(ProductsResearchHotbed).filter_by(
+                    idproductsResearchHotbed=activity.productsResearchHotbed_idproductsResearchHotbed
+                ).first()
+                if product:
+                    activity_data['product_data'] = {
+                        'category': product.category_productsResearchHotbed,
+                        'type': product.type_productsResearchHotbed,
+                        'description': product.description_productsResearchHotbed
+                    }
+            
+            elif (activity.type_activitiesResearchHotbed and 
+                  activity.type_activitiesResearchHotbed.lower() == 'reconocimiento' and 
+                  activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed):
                 
-                # Obtener datos específicos según el tipo (mismo código que en pdf_export_controller.py)
-                if (activity.type_activitiesResearchHotbed and 
-                    activity.type_activitiesResearchHotbed.lower() == 'proyecto' and 
-                    activity.projectsResearchHotbed_idprojectsResearchHotbed):
-                    
-                    from models.projects_researchHotbed import ProjectsResearchHotbed
-                    project = db.session.query(ProjectsResearchHotbed).filter_by(
-                        idprojectsResearchHotbed=activity.projectsResearchHotbed_idprojectsResearchHotbed
-                    ).first()
-                    if project:
-                        activity_data['project_data'] = {
-                            'name': project.name_projectsResearchHotbed or 'Sin especificar',
-                            'reference_number': project.referenceNumber_projectsResearchHotbed,
-                            'start_date': project.startDate_projectsResearchHotbed,
-                            'end_date': project.endDate_projectsResearchHotbed,
-                            'principal_researcher': project.principalResearcher_projectsResearchHotbed,
-                            'co_researchers': project.coResearchers_projectsResearchHotbed or 'Ninguno'
-                        }
-                
-                elif (activity.type_activitiesResearchHotbed and 
-                      activity.type_activitiesResearchHotbed.lower() == 'producto' and 
-                      activity.productsResearchHotbed_idproductsResearchHotbed):
-                    
-                    from models.products_researchHotbed import ProductsResearchHotbed
-                    product = db.session.query(ProductsResearchHotbed).filter_by(
-                        idproductsResearchHotbed=activity.productsResearchHotbed_idproductsResearchHotbed
-                    ).first()
-                    if product:
-                        activity_data['product_data'] = {
-                            'category': product.category_productsResearchHotbed,
-                            'type': product.type_productsResearchHotbed,
-                            'description': product.description_productsResearchHotbed
-                        }
-                
-                elif (activity.type_activitiesResearchHotbed and 
-                      activity.type_activitiesResearchHotbed.lower() == 'reconocimiento' and 
-                      activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed):
-                    
-                    from models.recognitions_researchHotbed import RecognitionsResearchHotbed
-                    recognition = db.session.query(RecognitionsResearchHotbed).filter_by(
-                        idrecognitionsResearchHotbed=activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed
-                    ).first()
-                    if recognition:
-                        activity_data['recognition_data'] = {
-                            'project_name': recognition.projectName_recognitionsResearchHotbed,
-                            'organization_name': recognition.organizationName_recognitionsResearchHotbed
-                        }
-                
-                filtered_activities.append(activity_data)
+                from models.recognitions_researchHotbed import RecognitionsResearchHotbed
+                recognition = db.session.query(RecognitionsResearchHotbed).filter_by(
+                    idrecognitionsResearchHotbed=activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed
+                ).first()
+                if recognition:
+                    activity_data['recognition_data'] = {
+                        'project_name': recognition.projectName_recognitionsResearchHotbed,
+                        'organization_name': recognition.organizationName_recognitionsResearchHotbed
+                    }
+            
+            filtered_activities.append(activity_data)
                 
         return filtered_activities
         
@@ -253,7 +235,7 @@ def get_research_hotbed_name(user_research_hotbed_id):
     """Obtiene el nombre del semillero por ID de user_research_hotbed"""
     try:
         result = db.session.query(ResearchHotbed.name_researchHotbed).join(
-            UsersResearchHotbed, ResearchHotbed.idresearchHotbed == UsersResearchHotbed.researchHotBed_idresearchHotbed
+            UsersResearchHotbed, ResearchHotbed.idresearchHotbed == UsersResearchHotbed.researchHotbed_idresearchHotbed
         ).filter(
             UsersResearchHotbed.idusersResearchHotbed == user_research_hotbed_id
         ).first()
@@ -375,12 +357,11 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
             story.append(Paragraph(f"{activity_type.upper()} ({len(type_activities)})", std_styles['subheading']))
             
             for i, activity in enumerate(type_activities, 1):
-                # Información básica - SIN RESPONSABLE
+                # Información básica - SIN CATEGORÍA
                 basic_info = [
                     ['Título:', activity['title'][:45] + '...' if len(activity['title']) > 45 else activity['title']],
                     ['Fecha:', activity['date'].strftime('%d/%m/%Y')],
                     ['Semillero:', activity['research_hotbed_name'][:35] + '...' if len(activity['research_hotbed_name']) > 35 else activity['research_hotbed_name']],
-                    ['Categoría:', activity['category']],
                     ['Duración:', f"{activity['duration']} horas"],
                     ['Horario:', f"{activity['start_time']} - {activity['end_time']}" if activity['start_time'] and activity['end_time'] else 'No especificado'],
                     ['Horas libres:', 'Aprobadas' if activity['approved_free_hours'] else 'Pendientes']
@@ -396,15 +377,13 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
                 if activity['organization_name']:
                     basic_info.append(['Organización:', activity['organization_name']])
                 
-                # Información específica según el tipo - MISMO FORMATO
+                # Información específica según el tipo - SIN INVESTIGADORES EN PROYECTOS
                 if 'project_data' in activity:
                     project = activity['project_data']
                     basic_info.append(['DATOS DEL PROYECTO', ''])
                     basic_info.extend([
                         ['Nombre proyecto:', project['name'][:35] + '...' if len(project['name']) > 35 else project['name']],
                         ['Ref. proyecto:', project['reference_number']],
-                        ['Investigador principal:', project['principal_researcher'][:30] + '...' if len(project['principal_researcher']) > 30 else project['principal_researcher']],
-                        ['Co-investigadores:', project['co_researchers'][:35] + '...' if len(project['co_researchers']) > 35 else project['co_researchers']],
                         ['Fecha inicio:', project['start_date'].strftime('%d/%m/%Y') if project['start_date'] else 'N/A'],
                         ['Fecha fin:', project['end_date'].strftime('%d/%m/%Y') if project['end_date'] else 'N/A']
                     ])
