@@ -3,11 +3,11 @@ from models.activities_researchHotbed import ActivitiesResearchHotbed
 from models.projects_researchHotbed import ProjectsResearchHotbed
 from models.products_researchHotbed import ProductsResearchHotbed
 from models.recognitions_researchHotbed import RecognitionsResearchHotbed
-from db.connection import db
-from datetime import datetime
-
 from models.users import User
 from models.users_research_hotbed import UsersResearchHotbed
+from models.activity_authors import ActivityAuthors  # MOVIDO AQUÍ
+from db.connection import db
+from datetime import datetime
 
 def update_activity(activity_id, data):
     try:
@@ -27,9 +27,47 @@ def update_activity(activity_id, data):
         activity.duration_activitiesResearchHotbed = data.get('duration', activity.duration_activitiesResearchHotbed)
         activity.approvedFreeHours_activitiesResearchHotbed = data.get('approved_free_hours', activity.approvedFreeHours_activitiesResearchHotbed)
         
-        # CORREGIDO: Actualizar el semestre si se proporciona
+        # Actualizar el semestre si se proporciona
         if 'semester' in data:
             activity.semester = data['semester']
+
+        # Actualizar autores y co-autores si se proporcionan
+        if 'authors_ids' in data or 'co_authors_ids' in data:
+            # Eliminar todas las relaciones de autoría existentes
+            ActivityAuthors.query.filter_by(activity_id=activity.idactivitiesResearchHotbed).delete()
+            
+            # Validar que todos los autores existan
+            all_user_ids = data.get('authors_ids', []) + data.get('co_authors_ids', [])
+            for user_id in all_user_ids:
+                user_exists = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=user_id).first()
+                if not user_exists:
+                    return jsonify({"error": f"El usuario con ID {user_id} no existe en el semillero"}), 400
+            
+            # Crear nuevas relaciones de autoría para autores principales
+            for author_id in data.get('authors_ids', []):
+                author_relation = ActivityAuthors(
+                    activity_id=activity.idactivitiesResearchHotbed,
+                    user_research_hotbed_id=author_id,
+                    is_main_author=True
+                )
+                db.session.add(author_relation)
+
+            # Crear nuevas relaciones de autoría para co-autores
+            for co_author_id in data.get('co_authors_ids', []):
+                co_author_relation = ActivityAuthors(
+                    activity_id=activity.idactivitiesResearchHotbed,
+                    user_research_hotbed_id=co_author_id,
+                    is_main_author=False
+                )
+                db.session.add(co_author_relation)
+            
+            # Actualizar el responsable con el primer autor principal
+            if data.get('authors_ids'):
+                first_author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=data.get('authors_ids')[0]).first()
+                if first_author_urh:
+                    user_info = db.session.query(User).filter_by(iduser=first_author_urh.user_iduser).first()
+                    if user_info:
+                        activity.responsible_activitiesResearchHotbed = user_info.name_user
 
         # Si hay un proyecto asociado para actualizar o crear
         if 'project' in data:
@@ -63,7 +101,7 @@ def update_activity(activity_id, data):
             product.category_productsResearchHotbed = data['product'].get('category', product.category_productsResearchHotbed)
             product.type_productsResearchHotbed = data['product'].get('type', product.type_productsResearchHotbed)
             product.description_productsResearchHotbed = data['product'].get('description', product.description_productsResearchHotbed)
-            # CORREGIDO: Actualizar fecha de publicación
+            # Actualizar fecha de publicación
             if data['product'].get('date_publication'):
                 product.datePublication_productsResearchHotbed = datetime.strptime(data['product']['date_publication'], '%Y-%m-%d')
 
@@ -85,7 +123,6 @@ def update_activity(activity_id, data):
             # AUTO-COMPLETAR participantes con autores actuales (si no se proporciona explícitamente)
             if 'participants_names' not in data['recognition']:
                 # Obtener autores actuales de la actividad
-                from models.activity_authors import ActivityAuthors
                 participants = []
                 
                 activity_authors = db.session.query(ActivityAuthors)\
