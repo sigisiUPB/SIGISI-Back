@@ -108,22 +108,40 @@ def get_user_research_hotbeds(user_id):
         return []
 
 def get_user_activities_by_semester(user_id, semester):
-    """Obtiene actividades del usuario filtradas por semestre usando el campo 'semester'"""
+    """Obtiene actividades del usuario filtradas por semestre usando el campo 'semester' - INCLUYE ACTIVIDADES COMO CO-AUTOR"""
     try:
         # Obtener IDs de semilleros del usuario
         user_research_ids = db.session.query(UsersResearchHotbed.idusersResearchHotbed).filter(
             UsersResearchHotbed.user_iduser == user_id
         ).subquery()
         
-        # Consulta base de actividades filtradas por el campo semester
-        activities_query = db.session.query(ActivitiesResearchHotbed).filter(
+        # OPCIÓN 1: Actividades donde el usuario está directamente asociado al semillero
+        direct_activities = db.session.query(ActivitiesResearchHotbed).filter(
             ActivitiesResearchHotbed.usersResearchHotbed_idusersResearchHotbed.in_(user_research_ids),
-            ActivitiesResearchHotbed.semester == semester  # Filtrar por el campo semester
-        ).all()
+            ActivitiesResearchHotbed.semester == semester
+        )
+        
+        # OPCIÓN 2: Actividades donde el usuario es autor/co-autor (a través de ActivityAuthors)
+        authored_activities = db.session.query(ActivitiesResearchHotbed).join(
+            ActivityAuthors, ActivitiesResearchHotbed.idactivitiesResearchHotbed == ActivityAuthors.activity_id
+        ).filter(
+            ActivityAuthors.user_research_hotbed_id.in_(user_research_ids),
+            ActivitiesResearchHotbed.semester == semester
+        )
+        
+        # Combinar ambas consultas y eliminar duplicados
+        all_activities_query = direct_activities.union(authored_activities).all()
         
         # Procesar actividades
         filtered_activities = []
-        for activity in activities_query:
+        processed_ids = set()  # Para evitar duplicados
+        
+        for activity in all_activities_query:
+            # Evitar duplicados
+            if activity.idactivitiesResearchHotbed in processed_ids:
+                continue
+            processed_ids.add(activity.idactivitiesResearchHotbed)
+            
             # Obtener autores
             authors_data = get_activity_authors(activity.idactivitiesResearchHotbed)
             
@@ -148,7 +166,7 @@ def get_user_activities_by_semester(user_id, semester):
                 'research_hotbed_name': research_hotbed_name
             }
             
-            # Obtener datos específicos según el tipo - MISMA LÓGICA QUE SEMILLEROS
+            # Obtener datos específicos según el tipo
             if (activity.type_activitiesResearchHotbed and 
                 activity.type_activitiesResearchHotbed.lower() == 'proyecto' and 
                 activity.projectsResearchHotbed_idprojectsResearchHotbed):
@@ -344,7 +362,7 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
     story.append(stats_table)
     story.append(PageBreak())
     
-    # Actividades detalladas - MISMO FORMATO QUE EL SEMILLERO con colores de la app
+    # Actividades detalladas - INCLUIR INDICADOR DE PARTICIPACIÓN
     story.append(Paragraph(f"ACTIVIDADES DETALLADAS - {format_semester_label_detailed(semester)}", std_styles['heading']))
     
     if activities:
@@ -357,11 +375,15 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
             story.append(Paragraph(f"{activity_type.upper()} ({len(type_activities)})", std_styles['subheading']))
             
             for i, activity in enumerate(type_activities, 1):
-                # Información básica - SIN CATEGORÍA
+                # Verificar el rol del usuario en esta actividad
+                user_role = get_user_role_in_activity(user.iduser, activity['id'])
+                
+                # Información básica - SIN CATEGORÍA + ROL DEL USUARIO
                 basic_info = [
-                    ['Título:', activity['title'][:45] + '...' if len(activity['title']) > 45 else activity['title']],
+                    ['Título:', activity['title'][:42] + '...' if len(activity['title']) > 42 else activity['title']],
                     ['Fecha:', activity['date'].strftime('%d/%m/%Y')],
-                    ['Semillero:', activity['research_hotbed_name'][:35] + '...' if len(activity['research_hotbed_name']) > 35 else activity['research_hotbed_name']],
+                    ['Semillero:', activity['research_hotbed_name'][:32] + '...' if len(activity['research_hotbed_name']) > 32 else activity['research_hotbed_name']],
+                    ['Mi participación:', user_role],  # NUEVO CAMPO
                     ['Duración:', f"{activity['duration']} horas"],
                     ['Horario:', f"{activity['start_time']} - {activity['end_time']}" if activity['start_time'] and activity['end_time'] else 'No especificado'],
                     ['Horas libres:', 'Aprobadas' if activity['approved_free_hours'] else 'Pendientes']
@@ -487,11 +509,11 @@ def generate_consolidated_users_pdf(users, semester):
     story.append(general_info)
     story.append(Spacer(1, 25))
     
-    # Tabla consolidada de usuarios
+    # Tabla consolidada de usuarios - ACTUALIZADA
     users_data = [['#', 'Nombre', 'ID SIGAA', 'Tipo', 'Actividades', 'Horas']]
     
     for i, user in enumerate(users, 1):
-        activities = get_user_activities_by_semester(user.iduser, semester)
+        activities = get_user_activities_by_semester(user.iduser, semester)  # Ahora incluye co-autorías
         total_hours = sum(a['duration'] for a in activities)
         
         # Truncar nombre si es muy largo
@@ -515,3 +537,50 @@ def generate_consolidated_users_pdf(users, semester):
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+def get_user_role_in_activity(user_id, activity_id):
+    """Determina el rol del usuario en una actividad específica"""
+    try:
+        # Verificar si es autor principal
+        main_author = db.session.query(ActivityAuthors).join(
+            UsersResearchHotbed, ActivityAuthors.user_research_hotbed_id == UsersResearchHotbed.idusersResearchHotbed
+        ).filter(
+            UsersResearchHotbed.user_iduser == user_id,
+            ActivityAuthors.activity_id == activity_id,
+            ActivityAuthors.is_main_author == True
+        ).first()
+        
+        if main_author:
+            return "Autor principal"
+        
+        # Verificar si es co-autor
+        co_author = db.session.query(ActivityAuthors).join(
+            UsersResearchHotbed, ActivityAuthors.user_research_hotbed_id == UsersResearchHotbed.idusersResearchHotbed
+        ).filter(
+            UsersResearchHotbed.user_iduser == user_id,
+            ActivityAuthors.activity_id == activity_id,
+            ActivityAuthors.is_main_author == False
+        ).first()
+        
+        if co_author:
+            return "Co-autor"
+        
+        # Si no es autor, verificar si es el usuario asociado al semillero de la actividad
+        activity = db.session.query(ActivitiesResearchHotbed).filter_by(
+            idactivitiesResearchHotbed=activity_id
+        ).first()
+        
+        if activity:
+            user_research = db.session.query(UsersResearchHotbed).filter_by(
+                idusersResearchHotbed=activity.usersResearchHotbed_idusersResearchHotbed,
+                user_iduser=user_id
+            ).first()
+            
+            if user_research:
+                return "Miembro del semillero"
+        
+        return "Participante"
+        
+    except Exception as e:
+        logger.error(f"Error determinando rol del usuario en actividad: {str(e)}")
+        return "Participante"
