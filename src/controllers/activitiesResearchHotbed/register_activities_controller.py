@@ -5,17 +5,14 @@ from models.projects_researchHotbed import ProjectsResearchHotbed
 from models.products_researchHotbed import ProductsResearchHotbed
 from models.recognitions_researchHotbed import RecognitionsResearchHotbed
 from models.activity_authors import ActivityAuthors
-from models.users_research_hotbed import UsersResearchHotbed  # Corregir el nombre del import
-from models.users import User  # También importar User para obtener nombres
+from models.users_research_hotbed import UsersResearchHotbed
+from models.users import User
 from db.connection import db
 
 def register_activity(data):
     try:
         print(f"=== DEBUG REGISTER ACTIVITY ===")
         print(f"Datos completos recibidos: {data}")
-        print(f"Authors IDs: {data.get('authors_ids', [])}")
-        print(f"Co-authors IDs: {data.get('co_authors_ids', [])}")
-        print(f"UserResearchHotbedId: {data.get('userResearchHotbedId')}")
         
         # Validaciones básicas
         if not data.get('title') or not data.get('date') or not data.get('description'):
@@ -27,27 +24,13 @@ def register_activity(data):
         if not data.get('authors_ids') or len(data.get('authors_ids', [])) == 0:
             return jsonify({"error": "Debe especificar al menos un autor"}), 400
 
-        # Validar que todos los autores existan en la base de datos
+        # Validar que todos los autores existan
         all_user_ids = data.get('authors_ids', []) + data.get('co_authors_ids', [])
-        print(f"Validando usuarios: {all_user_ids}")  # Debug
-        
-        # Consultar todos los usuarios disponibles en la BD para debug
-        all_users_in_db = db.session.query(UsersResearchHotbed).all()
-        print(f"Usuarios disponibles en BD:")
-        for user in all_users_in_db:
-            print(f"  - ID: {user.idusersResearchHotbed}, Status: {user.status_usersResearchHotbed}")
         
         for user_id in all_user_ids:
             user_exists = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=user_id).first()
             if not user_exists:
-                print(f"Usuario no encontrado: {user_id}")  # Debug
                 return jsonify({"error": f"El usuario con ID {user_id} no existe en el semillero"}), 400
-            print(f"Usuario {user_id} encontrado: {user_exists.idusersResearchHotbed}")  # Debug
-
-        # Validar que el userResearchHotbedId también exista
-        main_user = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=data['userResearchHotbedId']).first()
-        if not main_user:
-            return jsonify({"error": f"El usuario principal con ID {data['userResearchHotbedId']} no existe"}), 400
 
         # IDs para relaciones
         project_id = None
@@ -61,19 +44,15 @@ def register_activity(data):
         if activity_type == 'proyecto' and data.get('project'):
             project_data = data['project']
             
-            # Usar automáticamente el responsable como investigador principal
             principal_researcher = data.get('responsible', '')
             if not principal_researcher and data.get('authors_ids'):
-                # Obtener el nombre del primer autor
                 first_author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=data.get('authors_ids')[0]).first()
                 if first_author_urh:
-                    # Obtener el nombre del usuario desde la tabla user
                     user_info = db.session.query(User).filter_by(iduser=first_author_urh.user_iduser).first()
                     principal_researcher = user_info.name_user if user_info else 'Primer autor'
-                else:
-                    principal_researcher = 'Primer autor seleccionado'
             
             new_project = ProjectsResearchHotbed(
+                name_projectsResearchHotbed=project_data.get('name', ''),  # CORREGIDO: Agregar name
                 referenceNumber_projectsResearchHotbed=project_data.get('reference_number', ''),
                 startDate_projectsResearchHotbed=datetime.strptime(project_data.get('start_date'), '%Y-%m-%d').date(),
                 endDate_projectsResearchHotbed=datetime.strptime(project_data.get('end_date'), '%Y-%m-%d').date() if project_data.get('end_date') else None,
@@ -91,7 +70,8 @@ def register_activity(data):
             new_product = ProductsResearchHotbed(
                 category_productsResearchHotbed=product_data.get('category', ''),
                 type_productsResearchHotbed=product_data.get('type', ''),
-                description_productsResearchHotbed=product_data.get('description', '')
+                description_productsResearchHotbed=product_data.get('description', ''),
+                datePublication_productsResearchHotbed=datetime.strptime(product_data.get('date_publication'), '%Y-%m-%d').date() if product_data.get('date_publication') else None  # CORREGIDO
             )
             
             db.session.add(new_product)
@@ -102,8 +82,32 @@ def register_activity(data):
         elif activity_type == 'reconocimiento' and data.get('recognition'):
             recognition_data = data['recognition']
             
+            # Auto-completar participantes con autores y co-autores
+            participants = []
+            
+            # Agregar autores principales
+            for author_id in data.get('authors_ids', []):
+                author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=author_id).first()
+                if author_urh:
+                    user_info = db.session.query(User).filter_by(iduser=author_urh.user_iduser).first()
+                    if user_info:
+                        participants.append(user_info.name_user)
+            
+            # Agregar co-autores
+            for co_author_id in data.get('co_authors_ids', []):
+                co_author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=co_author_id).first()
+                if co_author_urh:
+                    user_info = db.session.query(User).filter_by(iduser=co_author_urh.user_iduser).first()
+                    if user_info:
+                        participants.append(user_info.name_user)
+            
+            # Unir todos los participantes
+            participants_names = ', '.join(participants) if participants else ''
+            
             new_recognition = RecognitionsResearchHotbed(
+                name_recognitionsResearchHotbed=recognition_data.get('name', ''),
                 projectName_recognitionsResearchHotbed=recognition_data.get('project_name', ''),
+                participantsNames_recognitionsResearchHotbed=participants_names,  # AUTO-COMPLETADO
                 organizationName_recognitionsResearchHotbed=recognition_data.get('organization_name', '')
             )
             
@@ -122,7 +126,7 @@ def register_activity(data):
             endTime_activitiesResearchHotbed=datetime.strptime(data['end_time'], '%H:%M').time() if data.get('end_time') else None,
             duration_activitiesResearchHotbed=data.get('duration'),
             approvedFreeHours_activitiesResearchHotbed=1.0 if data.get('approved_free_hours') else 0.0,
-            semester=data.get('semester', 'semestre-1-2025'),
+            semester=data.get('semester', 'semestre-1-2025'),  # CORREGIDO: Campo semester
             usersResearchHotbed_idusersResearchHotbed=data['userResearchHotbedId'],
             projectsResearchHotbed_idprojectsResearchHotbed=project_id,
             productsResearchHotbed_idproductsResearchHotbed=product_id,
@@ -132,11 +136,8 @@ def register_activity(data):
         db.session.add(activity)
         db.session.flush()
 
-        print(f"Actividad creada con ID: {activity.idactivitiesResearchHotbed}")  # Debug
-
         # Crear relaciones de autoría para autores principales
         for author_id in data.get('authors_ids', []):
-            print(f"Agregando autor principal: {author_id}")  # Debug
             author_relation = ActivityAuthors(
                 activity_id=activity.idactivitiesResearchHotbed,
                 user_research_hotbed_id=author_id,
@@ -146,7 +147,6 @@ def register_activity(data):
 
         # Crear relaciones de autoría para co-autores
         for co_author_id in data.get('co_authors_ids', []):
-            print(f"Agregando co-autor: {co_author_id}")  # Debug
             co_author_relation = ActivityAuthors(
                 activity_id=activity.idactivitiesResearchHotbed,
                 user_research_hotbed_id=co_author_id,
@@ -155,7 +155,6 @@ def register_activity(data):
             db.session.add(co_author_relation)
 
         db.session.commit()
-        print("Transacción completada exitosamente")  # Debug
 
         return jsonify({
             "message": "Actividad registrada exitosamente",
@@ -164,10 +163,8 @@ def register_activity(data):
 
     except ValueError as ve:
         db.session.rollback()
-        print(f"Error de valor: {str(ve)}")
         return jsonify({"error": f"Error en formato de fecha: {str(ve)}"}), 400
     except Exception as e:
         db.session.rollback()
         print(f"Error en register_activity: {str(e)}")
-        print(f"Datos recibidos: {data}")  # Debug adicional
         return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500

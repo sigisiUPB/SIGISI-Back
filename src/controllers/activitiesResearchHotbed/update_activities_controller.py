@@ -23,6 +23,10 @@ def update_activity(activity_id, data):
         activity.endTime_activitiesResearchHotbed = datetime.strptime(data['end_time'], '%H:%M').time() if data.get('end_time') else activity.endTime_activitiesResearchHotbed
         activity.duration_activitiesResearchHotbed = data.get('duration', activity.duration_activitiesResearchHotbed)
         activity.approvedFreeHours_activitiesResearchHotbed = data.get('approved_free_hours', activity.approvedFreeHours_activitiesResearchHotbed)
+        
+        # CORREGIDO: Actualizar el semestre si se proporciona
+        if 'semester' in data:
+            activity.semester = data['semester']
 
         # Si hay un proyecto asociado para actualizar o crear
         if 'project' in data:
@@ -35,7 +39,7 @@ def update_activity(activity_id, data):
                 activity.projectsResearchHotbed_idprojectsResearchHotbed = project.idprojectsResearchHotbed
 
             # Actualizar todos los campos incluyendo name
-            project.name_projectsResearchHotbed = data['project'].get('name', project.name_projectsResearchHotbed)
+            project.name_projectsResearchHotbed = data['project'].get('name', getattr(project, 'name_projectsResearchHotbed', ''))
             project.referenceNumber_projectsResearchHotbed = data['project'].get('reference_number', project.referenceNumber_projectsResearchHotbed)
             if data['project'].get('start_date'):
                 project.startDate_projectsResearchHotbed = datetime.strptime(data['project']['start_date'], '%Y-%m-%d')
@@ -56,6 +60,7 @@ def update_activity(activity_id, data):
             product.category_productsResearchHotbed = data['product'].get('category', product.category_productsResearchHotbed)
             product.type_productsResearchHotbed = data['product'].get('type', product.type_productsResearchHotbed)
             product.description_productsResearchHotbed = data['product'].get('description', product.description_productsResearchHotbed)
+            # CORREGIDO: Actualizar fecha de publicación
             if data['product'].get('date_publication'):
                 product.datePublication_productsResearchHotbed = datetime.strptime(data['product']['date_publication'], '%Y-%m-%d')
 
@@ -69,10 +74,33 @@ def update_activity(activity_id, data):
                 db.session.flush()
                 activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed = recognition.idrecognitionsResearchHotbed
 
-            # Eliminar la línea que causa error: name_recognitionsResearchHotbed no se usa en el frontend
+            # Actualizar campos del reconocimiento
+            recognition.name_recognitionsResearchHotbed = data['recognition'].get('name', getattr(recognition, 'name_recognitionsResearchHotbed', ''))
             recognition.projectName_recognitionsResearchHotbed = data['recognition'].get('project_name', recognition.projectName_recognitionsResearchHotbed)
-            recognition.participantsNames_recognitionsResearchHotbed = data['recognition'].get('participants_names', recognition.participantsNames_recognitionsResearchHotbed)
             recognition.organizationName_recognitionsResearchHotbed = data['recognition'].get('organization_name', recognition.organizationName_recognitionsResearchHotbed)
+            
+            # AUTO-COMPLETAR participantes con autores actuales (si no se proporciona explícitamente)
+            if 'participants_names' not in data['recognition']:
+                # Obtener autores actuales de la actividad
+                from models.activity_authors import ActivityAuthors
+                participants = []
+                
+                activity_authors = db.session.query(ActivityAuthors)\
+                    .filter_by(activity_id=activity.idactivitiesResearchHotbed)\
+                    .all()
+                
+                for author_relation in activity_authors:
+                    author_urh = db.session.query(UsersResearchHotbed)\
+                        .filter_by(idusersResearchHotbed=author_relation.user_research_hotbed_id)\
+                        .first()
+                    if author_urh:
+                        user_info = db.session.query(User).filter_by(iduser=author_urh.user_iduser).first()
+                        if user_info:
+                            participants.append(user_info.name_user)
+                
+                recognition.participantsNames_recognitionsResearchHotbed = ', '.join(participants) if participants else ''
+            else:
+                recognition.participantsNames_recognitionsResearchHotbed = data['recognition']['participants_names']
 
         db.session.commit()
 
@@ -80,4 +108,5 @@ def update_activity(activity_id, data):
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error en update_activity: {str(e)}")
         return jsonify({"error": str(e)}), 500

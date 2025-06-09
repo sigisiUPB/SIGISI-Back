@@ -33,7 +33,7 @@ def get_activity_details(activity_id):
             "end_time": activity.endTime_activitiesResearchHotbed.strftime('%H:%M') if activity.endTime_activitiesResearchHotbed else '',
             "duration": float(activity.duration_activitiesResearchHotbed) if activity.duration_activitiesResearchHotbed else 0,
             "approved_free_hours": bool(activity.approvedFreeHours_activitiesResearchHotbed) if activity.approvedFreeHours_activitiesResearchHotbed else False,
-            "semester": getattr(activity, 'semester', 'semestre-1-2025'),
+            "semester": getattr(activity, 'semester', 'semestre-1-2025'),  # CORREGIDO
             "project": None,
             "product": None,
             "recognition": None,
@@ -49,6 +49,7 @@ def get_activity_details(activity_id):
             
             if project:
                 activity_data["project"] = {
+                    "name": getattr(project, 'name_projectsResearchHotbed', ''),  # CORREGIDO
                     "reference_number": project.referenceNumber_projectsResearchHotbed,
                     "start_date": project.startDate_projectsResearchHotbed.isoformat() if project.startDate_projectsResearchHotbed else "",
                     "end_date": project.endDate_projectsResearchHotbed.isoformat() if project.endDate_projectsResearchHotbed else "",
@@ -66,7 +67,7 @@ def get_activity_details(activity_id):
                     "category": product.category_productsResearchHotbed,
                     "type": product.type_productsResearchHotbed,
                     "description": product.description_productsResearchHotbed,
-                    "date_publication": ""  # No existe en la tabla actual
+                    "date_publication": product.datePublication_productsResearchHotbed.isoformat() if hasattr(product, 'datePublication_productsResearchHotbed') and product.datePublication_productsResearchHotbed else ""  # CORREGIDO
                 }
 
         # Obtener datos del reconocimiento si existe
@@ -77,9 +78,9 @@ def get_activity_details(activity_id):
             
             if recognition:
                 activity_data["recognition"] = {
-                    "name": "",  # No existe en la tabla actual
+                    "name": getattr(recognition, 'name_recognitionsResearchHotbed', ''),  # CORREGIDO
                     "project_name": recognition.projectName_recognitionsResearchHotbed,
-                    "participants_names": "",  # No existe en la tabla actual
+                    "participants_names": getattr(recognition, 'participantsNames_recognitionsResearchHotbed', ''),  # CORREGIDO
                     "organization_name": recognition.organizationName_recognitionsResearchHotbed
                 }
 
@@ -112,7 +113,6 @@ def get_activity_details(activity_id):
 
         except Exception as e:
             print(f"Error al obtener autores: {str(e)}")
-            # Continuar sin autores si hay error
 
         return jsonify({"activity_details": activity_data}), 200
 
