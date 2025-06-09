@@ -108,7 +108,7 @@ def get_user_research_hotbeds(user_id):
         return []
 
 def get_user_activities_by_semester(user_id, semester):
-    """Obtiene actividades del usuario filtradas por semestre"""
+    """Obtiene actividades del usuario filtradas por semestre con datos completos"""
     try:
         # Extraer año y número de semestre
         semester_parts = semester.split('-')
@@ -145,7 +145,7 @@ def get_user_activities_by_semester(user_id, semester):
                 # Obtener nombre del semillero
                 research_hotbed_name = get_research_hotbed_name(activity.usersResearchHotbed_idusersResearchHotbed)
                 
-                filtered_activities.append({
+                activity_data = {
                     'id': activity.idactivitiesResearchHotbed,
                     'title': activity.title_activitiesResearchHotbed,
                     'responsible': activity.responsible_activitiesResearchHotbed,
@@ -156,7 +156,48 @@ def get_user_activities_by_semester(user_id, semester):
                     'approved_free_hours': bool(activity.approvedFreeHours_activitiesResearchHotbed),
                     'authors': authors_data,
                     'research_hotbed_name': research_hotbed_name
-                })
+                }
+                
+                # Obtener datos específicos según el tipo
+                if activity.type_activitiesResearchHotbed and activity.type_activitiesResearchHotbed.lower() == 'proyecto' and activity.projectsResearchHotbed_idprojectsResearchHotbed:
+                    from models.projects_researchHotbed import ProjectsResearchHotbed
+                    project = db.session.query(ProjectsResearchHotbed).filter_by(
+                        idprojectsResearchHotbed=activity.projectsResearchHotbed_idprojectsResearchHotbed
+                    ).first()
+                    if project:
+                        activity_data['project_data'] = {
+                            'name': project.name_projectsResearchHotbed or 'Sin especificar',
+                            'reference_number': project.referenceNumber_projectsResearchHotbed,
+                            'start_date': project.startDate_projectsResearchHotbed,
+                            'end_date': project.endDate_projectsResearchHotbed,
+                            'principal_researcher': project.principalResearcher_projectsResearchHotbed,
+                            'co_researchers': project.coResearchers_projectsResearchHotbed or 'Ninguno'
+                        }
+                
+                elif activity.type_activitiesResearchHotbed and activity.type_activitiesResearchHotbed.lower() == 'producto' and activity.productsResearchHotbed_idproductsResearchHotbed:
+                    from models.products_researchHotbed import ProductsResearchHotbed
+                    product = db.session.query(ProductsResearchHotbed).filter_by(
+                        idproductsResearchHotbed=activity.productsResearchHotbed_idproductsResearchHotbed
+                    ).first()
+                    if product:
+                        activity_data['product_data'] = {
+                            'category': product.category_productsResearchHotbed,
+                            'type': product.type_productsResearchHotbed,
+                            'description': product.description_productsResearchHotbed
+                        }
+                
+                elif activity.type_activitiesResearchHotbed and activity.type_activitiesResearchHotbed.lower() == 'reconocimiento' and activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed:
+                    from models.recognitions_researchHotbed import RecognitionsResearchHotbed
+                    recognition = db.session.query(RecognitionsResearchHotbed).filter_by(
+                        idrecognitionsResearchHotbed=activity.recognitionsResearchHotbed_idrecognitionsResearchHotbed
+                    ).first()
+                    if recognition:
+                        activity_data['recognition_data'] = {
+                            'project_name': recognition.projectName_recognitionsResearchHotbed,
+                            'organization_name': recognition.organizationName_recognitionsResearchHotbed
+                        }
+                
+                filtered_activities.append(activity_data)
                 
         return filtered_activities
         
@@ -197,7 +238,7 @@ def get_research_hotbed_name(user_research_hotbed_id):
     """Obtiene el nombre del semillero por ID de user_research_hotbed"""
     try:
         result = db.session.query(ResearchHotbed.name_researchHotbed).join(
-            UsersResearchHotbed, ResearchHotbed.idresearchHotbed == UsersResearchHotbed.researchHotbed_idresearchHotbed
+            UsersResearchHotbed, ResearchHotbed.idresearchHotbed == UsersResearchHotbed.researchHotBed_idresearchHotbed
         ).filter(
             UsersResearchHotbed.idusersResearchHotbed == user_research_hotbed_id
         ).first()
@@ -209,17 +250,17 @@ def get_research_hotbed_name(user_research_hotbed_id):
         return 'Semillero no especificado'
 
 def generate_user_pdf_report(user, research_hotbeds, activities, semester):
-    """Genera el PDF individual del usuario usando ReportLab"""
+    """Genera el PDF individual del usuario con tablas responsivas"""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, bottomMargin=1*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.8*inch, bottomMargin=0.8*inch, leftMargin=0.7*inch, rightMargin=0.7*inch)
     
     # Estilos
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Title'],
-        fontSize=18,
-        spaceAfter=30,
+        fontSize=16,
+        spaceAfter=20,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#2563eb')
     )
@@ -227,8 +268,8 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
     heading_style = ParagraphStyle(
         'CustomHeading',
         parent=styles['Heading1'],
-        fontSize=14,
-        spaceAfter=12,
+        fontSize=12,
+        spaceAfter=10,
         textColor=colors.HexColor('#374151')
     )
     
@@ -240,112 +281,108 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
     story.append(title)
     
     # Información del usuario
-    info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=12, alignment=TA_CENTER)
+    info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=11, alignment=TA_CENTER)
     user_info = Paragraph(
         f"<b>{user.name_user}</b><br/>"
-        f"{format_semester_label_detailed(semester)} | SIGISI - Sistema de Gestión de Semilleros",
+        f"{format_semester_label_detailed(semester)} | SIGISI",
         info_style
     )
     story.append(user_info)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
-    # Información personal
+    # Información personal - Tabla responsiva
     story.append(Paragraph("INFORMACIÓN PERSONAL", heading_style))
     
     personal_data = [
-        ['Nombre completo:', user.name_user],
+        ['Nombre:', user.name_user],
         ['ID SIGAA:', user.idSigaa_user or 'Sin especificar'],
-        ['Correo electrónico:', user.email_user],
-        ['Programa académico:', user.academicProgram_user or 'Sin especificar'],
-        ['Tipo de usuario:', user.type_user],
+        ['Email:', user.email_user],
+        ['Programa:', user.academicProgram_user[:40] + '...' if user.academicProgram_user and len(user.academicProgram_user) > 40 else user.academicProgram_user or 'Sin especificar'],
+        ['Tipo:', user.type_user],
         ['Estado:', user.status_user],
-        ['Fecha de reporte:', datetime.now().strftime('%d/%m/%Y')]
+        ['Fecha reporte:', datetime.now().strftime('%d/%m/%Y')]
     ]
     
-    personal_table = Table(personal_data, colWidths=[3*inch, 3*inch])
+    personal_table = Table(personal_data, colWidths=[1.5*inch, 4.5*inch])
     personal_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280')),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151'))
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb'))
     ]))
     
     story.append(personal_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
-    # Semilleros de investigación
+    # Semilleros - Tabla más compacta
     story.append(Paragraph("SEMILLEROS DE INVESTIGACIÓN", heading_style))
     
     if research_hotbeds:
-        hotbeds_data = [['Semillero', 'Acrónimo', 'Facultad', 'Rol', 'Estado', 'Fecha Ingreso']]
+        hotbeds_data = [['Semillero', 'Rol', 'Estado', 'Ingreso']]
         for hotbed in research_hotbeds:
+            # Truncar nombres largos
+            name = hotbed['name'][:30] + '...' if len(hotbed['name']) > 30 else hotbed['name']
             hotbeds_data.append([
-                hotbed['name'],
-                hotbed['acronym'],
-                hotbed['faculty'],
+                f"{name} ({hotbed['acronym']})",
                 hotbed['type'],
                 hotbed['status'],
-                hotbed['dateEnter'].strftime('%d/%m/%Y') if hotbed['dateEnter'] else 'N/A'
+                hotbed['dateEnter'].strftime('%m/%Y') if hotbed['dateEnter'] else 'N/A'
             ])
         
-        hotbeds_table = Table(hotbeds_data, colWidths=[2*inch, 0.8*inch, 1.5*inch, 1*inch, 0.8*inch, 1*inch])
+        hotbeds_table = Table(hotbeds_data, colWidths=[3*inch, 1.2*inch, 1*inch, 0.8*inch])
         hotbeds_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8)
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
         ]))
         
         story.append(hotbeds_table)
     else:
-        no_hotbeds = Paragraph("No está asociado a ningún semillero de investigación.", styles['Normal'])
+        no_hotbeds = Paragraph("No está asociado a ningún semillero.", styles['Normal'])
         story.append(no_hotbeds)
     
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
-    # Resumen de actividades
-    story.append(Paragraph(f"RESUMEN DE ACTIVIDADES - {format_semester_label_detailed(semester)}", heading_style))
+    # Resumen de actividades - Más compacto
+    story.append(Paragraph(f"RESUMEN - {format_semester_label_detailed(semester)}", heading_style))
     
     total_hours = sum(a['duration'] for a in activities)
     approved_activities = len([a for a in activities if a['approved_free_hours']])
     
     stats_data = [
-        ['Indicador', 'Valor'],
-        ['Total de actividades reportadas', str(len(activities))],
-        ['Horas totales registradas', f'{total_hours} horas'],
-        ['Actividades con horas libres aprobadas', str(approved_activities)],
-        ['Actividades pendientes de aprobación', str(len(activities) - approved_activities)],
-        ['Proyectos', str(len([a for a in activities if 'proyecto' in a['type'].lower()]))],
-        ['Productos', str(len([a for a in activities if 'producto' in a['type'].lower()]))],
-        ['Reconocimientos', str(len([a for a in activities if 'reconocimiento' in a['type'].lower()]))]
+        ['Total actividades', str(len(activities)), 'Horas totales', f'{total_hours}h'],
+        ['Aprobadas', str(approved_activities), 'Pendientes', str(len(activities) - approved_activities)],
+        ['Proyectos', str(len([a for a in activities if 'proyecto' in a['type'].lower()])), 'Productos', str(len([a for a in activities if 'producto' in a['type'].lower()]))],
+        ['Reconocimientos', str(len([a for a in activities if 'reconocimiento' in a['type'].lower()])), '', '']
     ]
     
-    stats_table = Table(stats_data, colWidths=[4*inch, 1.5*inch])
+    stats_table = Table(stats_data, colWidths=[1.5*inch, 1*inch, 1.5*inch, 1*inch])
     stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-        ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#2563eb'))
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#2563eb')),
+        ('TEXTCOLOR', (3, 0), (3, -1), colors.HexColor('#2563eb')),
+        ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+        ('ALIGN', (3, 0), (3, -1), 'CENTER')
     ]))
     
     story.append(stats_table)
     story.append(PageBreak())
     
-    # Actividades detalladas
+    # Actividades detalladas - Mismo formato que el semillero
     story.append(Paragraph(f"ACTIVIDADES DETALLADAS - {format_semester_label_detailed(semester)}", heading_style))
     
     if activities:
@@ -358,44 +395,60 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
             story.append(Paragraph(f"{activity_type.upper()} ({len(type_activities)})", heading_style))
             
             for i, activity in enumerate(type_activities, 1):
-                # Título de la actividad
-                activity_title = Paragraph(f"{i}. {activity['title']}", styles['Heading2'])
-                story.append(activity_title)
-                
-                # Información básica
-                info_data = [
+                # Información básica en tabla
+                basic_info = [
+                    ['Título:', activity['title'][:50] + '...' if len(activity['title']) > 50 else activity['title']],
                     ['Responsable:', activity['responsible']],
                     ['Fecha:', activity['date'].strftime('%d/%m/%Y')],
                     ['Duración:', f"{activity['duration']} horas"],
-                    ['Horas libres aprobadas:', 'Sí' if activity['approved_free_hours'] else 'No'],
-                    ['Semillero:', activity['research_hotbed_name']]
+                    ['Semillero:', activity['research_hotbed_name'][:40] + '...' if len(activity['research_hotbed_name']) > 40 else activity['research_hotbed_name']],
+                    ['Aprobada:', 'Sí' if activity['approved_free_hours'] else 'No']
                 ]
                 
+                # Agregar información específica según el tipo
+                if 'project_data' in activity:
+                    project = activity['project_data']
+                    basic_info.extend([
+                        ['Proyecto:', project['name'][:40] + '...' if len(project['name']) > 40 else project['name']],
+                        ['Ref.:', project['reference_number']],
+                        ['Investigador:', project['principal_researcher'][:35] + '...' if len(project['principal_researcher']) > 35 else project['principal_researcher']]
+                    ])
+                
+                elif 'product_data' in activity:
+                    product = activity['product_data']
+                    basic_info.extend([
+                        ['Categoría:', product['category']],
+                        ['Tipo:', product['type']],
+                        ['Descripción:', product['description'][:60] + '...' if len(product['description']) > 60 else product['description']]
+                    ])
+                
+                elif 'recognition_data' in activity:
+                    recognition = activity['recognition_data']
+                    basic_info.extend([
+                        ['Proyecto:', recognition['project_name'][:40] + '...' if len(recognition['project_name']) > 40 else recognition['project_name']],
+                        ['Organización:', recognition['organization_name'][:40] + '...' if len(recognition['organization_name']) > 40 else recognition['organization_name']]
+                    ])
+                
+                # Autores
                 if activity['authors']['main_authors']:
-                    info_data.append(['Autores principales:', ', '.join(activity['authors']['main_authors'])])
+                    authors_text = ', '.join(activity['authors']['main_authors'])
+                    if len(authors_text) > 50:
+                        authors_text = authors_text[:50] + '...'
+                    basic_info.append(['Autores:', authors_text])
                 
-                if activity['authors']['co_authors']:
-                    info_data.append(['Co-autores:', ', '.join(activity['authors']['co_authors'])])
-                
-                info_table = Table(info_data, colWidths=[2*inch, 4*inch])
+                info_table = Table(basic_info, colWidths=[1.5*inch, 4.5*inch])
                 info_table.setStyle(TableStyle([
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
                     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280'))
+                    ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280')),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb'))
                 ]))
                 
                 story.append(info_table)
                 story.append(Spacer(1, 10))
-                
-                # Descripción
-                if activity['description']:
-                    desc_style = ParagraphStyle('Description', parent=styles['Normal'], fontSize=9)
-                    description = Paragraph(f"<b>Descripción:</b> {activity['description']}", desc_style)
-                    story.append(description)
-                
-                story.append(Spacer(1, 15))
                 
     else:
         no_activities = Paragraph(f"No se encontraron actividades para {format_semester_label_detailed(semester)}.", styles['Normal'])
@@ -408,17 +461,17 @@ def generate_user_pdf_report(user, research_hotbeds, activities, semester):
     return buffer
 
 def generate_consolidated_users_pdf(users, semester):
-    """Genera un PDF consolidado con múltiples usuarios"""
+    """Genera un PDF consolidado con tablas responsivas"""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, bottomMargin=1*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.8*inch, bottomMargin=0.8*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     
     # Estilos
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Title'],
-        fontSize=18,
-        spaceAfter=30,
+        fontSize=16,
+        spaceAfter=20,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#2563eb')
     )
@@ -431,47 +484,48 @@ def generate_consolidated_users_pdf(users, semester):
     story.append(title)
     
     # Información general
-    info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=12, alignment=TA_CENTER)
+    info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=11, alignment=TA_CENTER)
     general_info = Paragraph(
         f"{format_semester_label_detailed(semester)} | {len(users)} usuarios<br/>"
         f"SIGISI - Sistema de Gestión de Semilleros",
         info_style
     )
     story.append(general_info)
-    story.append(Spacer(1, 30))
+    story.append(Spacer(1, 20))
     
-    # Tabla consolidada de usuarios
-    users_data = [['#', 'Nombre', 'ID SIGAA', 'Email', 'Programa', 'Tipo', 'Actividades', 'Horas']]
+    # Tabla consolidada de usuarios - Más responsiva
+    users_data = [['#', 'Nombre', 'ID', 'Tipo', 'Act.', 'Hrs']]
     
     for i, user in enumerate(users, 1):
         activities = get_user_activities_by_semester(user.iduser, semester)
         total_hours = sum(a['duration'] for a in activities)
         
+        # Truncar nombre si es muy largo
+        name = user.name_user[:20] + '...' if len(user.name_user) > 20 else user.name_user
+        type_user = user.type_user[:8] + '...' if len(user.type_user) > 8 else user.type_user
+        
         users_data.append([
             str(i),
-            user.name_user,
+            name,
             user.idSigaa_user or 'N/A',
-            user.email_user,
-            user.academicProgram_user or 'N/A',
-            user.type_user,
+            type_user,
             str(len(activities)),
             f'{total_hours}h'
         ])
     
-    users_table = Table(users_data, colWidths=[0.3*inch, 1.8*inch, 0.8*inch, 1.5*inch, 1.2*inch, 0.8*inch, 0.6*inch, 0.6*inch])
+    users_table = Table(users_data, colWidths=[0.3*inch, 2.5*inch, 1*inch, 1*inch, 0.5*inch, 0.7*inch])
     users_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-        ('ALIGN', (3, 1), (3, -1), 'LEFT'),
-        ('ALIGN', (4, 1), (4, -1), 'LEFT')
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
     ]))
     
     story.append(users_table)
