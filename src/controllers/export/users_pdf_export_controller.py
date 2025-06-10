@@ -18,15 +18,16 @@ logger = logging.getLogger(__name__)
 
 def export_user_excel(user_id, semester):
     """
-    Genera un archivo Excel individual para un usuario específico
+    Exporta los datos de un usuario específico a Excel
     """
     try:
-        # Validaciones
-        if not semester or not is_valid_semester(semester):
+        # Validar semestre
+        if not is_valid_semester(semester):
             return jsonify({"error": "Semestre inválido"}), 400
-            
-        # Obtener usuario
-        user = User.query.get(user_id)
+        
+        # Buscar el usuario - ARREGLAR deprecated .get()
+        user = db.session.get(User, user_id)
+        
         if not user:
             return jsonify({"error": "Usuario no encontrado"}), 404
             
@@ -46,8 +47,8 @@ def export_user_excel(user_id, semester):
         return response
         
     except Exception as e:
-        logger.error(f"Error generando Excel de usuario: {str(e)}")
-        return jsonify({"error": f"Error generando Excel: {str(e)}"}), 500
+        logger.error(f"Error exportando usuario a Excel: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 def export_multiple_users_excel(user_ids, semester):
     """

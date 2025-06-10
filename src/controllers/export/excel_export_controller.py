@@ -138,35 +138,33 @@ def export_research_hotbed_excel(research_hotbed_id, semester):
     con hojas separadas para cada tipo de información
     """
     try:
-        # Validaciones
-        if not semester or not is_valid_semester(semester):
+        # Validar semestre
+        if not is_valid_semester(semester):
             return jsonify({"error": "Semestre inválido"}), 400
-            
-        # Obtener datos del semillero
-        research_hotbed = ResearchHotbed.query.get(research_hotbed_id)
+        
+        # Buscar el semillero - ARREGLAR deprecated .get()
+        research_hotbed = db.session.get(ResearchHotbed, research_hotbed_id)
+        
         if not research_hotbed:
             return jsonify({"error": "Semillero no encontrado"}), 404
-            
-        # Obtener miembros activos
-        members = get_active_members(research_hotbed_id)
         
-        # Obtener actividades del semestre
+        # Obtener miembros activos y actividades
+        members = get_active_members(research_hotbed_id)
         activities = get_activities_by_semester(research_hotbed_id, semester)
         
         # Generar Excel
         excel_buffer = generate_excel_report(research_hotbed, members, activities, semester)
         
-        # Crear respuesta
+        # Preparar respuesta
         response = make_response(excel_buffer.getvalue())
         response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        response.headers['Content-Disposition'] = f'attachment; filename="{research_hotbed.acronym_researchHotbed}_{semester}_reporte.xlsx"'
+        response.headers['Content-Disposition'] = f'attachment; filename={research_hotbed.acronym_researchHotbed}_{semester}_reporte.xlsx'
         
-        logger.info(f"Excel generado exitosamente para semillero {research_hotbed_id}, semestre {semester}")
-        return response
+        return response, 200
         
     except Exception as e:
         logger.error(f"Error generando Excel: {str(e)}")
-        return jsonify({"error": f"Error generando Excel: {str(e)}"}), 500
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 def create_general_info_sheet(writer, research_hotbed, members, activities, semester):
     """Crea la hoja de información general del semillero con formato mejorado"""
