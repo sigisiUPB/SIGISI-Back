@@ -44,15 +44,16 @@ def register_activity(data):
         if activity_type == 'proyecto' and data.get('project'):
             project_data = data['project']
             
-            principal_researcher = data.get('responsible', '')
-            if not principal_researcher and data.get('authors_ids'):
+            # Usar el primer autor seleccionado como investigador principal
+            principal_researcher = ''
+            if data.get('authors_ids'):
                 first_author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=data.get('authors_ids')[0]).first()
                 if first_author_urh:
                     user_info = db.session.query(User).filter_by(iduser=first_author_urh.user_iduser).first()
                     principal_researcher = user_info.name_user if user_info else 'Primer autor'
             
             new_project = ProjectsResearchHotbed(
-                name_projectsResearchHotbed=project_data.get('name', ''),  # CORREGIDO: Agregar name
+                name_projectsResearchHotbed=project_data.get('name', ''),
                 referenceNumber_projectsResearchHotbed=project_data.get('reference_number', ''),
                 startDate_projectsResearchHotbed=datetime.strptime(project_data.get('start_date'), '%Y-%m-%d').date(),
                 endDate_projectsResearchHotbed=datetime.strptime(project_data.get('end_date'), '%Y-%m-%d').date() if project_data.get('end_date') else None,
@@ -63,7 +64,6 @@ def register_activity(data):
             db.session.flush()
             project_id = new_project.idprojectsResearchHotbed
 
-        # Crear producto si es necesario
         elif activity_type == 'producto' and data.get('product'):
             product_data = data['product']
             
@@ -71,14 +71,13 @@ def register_activity(data):
                 category_productsResearchHotbed=product_data.get('category', ''),
                 type_productsResearchHotbed=product_data.get('type', ''),
                 description_productsResearchHotbed=product_data.get('description', ''),
-                datePublication_productsResearchHotbed=datetime.strptime(product_data.get('date_publication'), '%Y-%m-%d').date() if product_data.get('date_publication') else None  # CORREGIDO
+                datePublication_productsResearchHotbed=datetime.strptime(product_data.get('date_publication'), '%Y-%m-%d').date() if product_data.get('date_publication') else None
             )
             
             db.session.add(new_product)
             db.session.flush()
             product_id = new_product.idproductsResearchHotbed
 
-        # Crear reconocimiento si es necesario
         elif activity_type == 'reconocimiento' and data.get('recognition'):
             recognition_data = data['recognition']
             
@@ -101,13 +100,12 @@ def register_activity(data):
                     if user_info:
                         participants.append(user_info.name_user)
             
-            # Unir todos los participantes
             participants_names = ', '.join(participants) if participants else ''
             
             new_recognition = RecognitionsResearchHotbed(
                 name_recognitionsResearchHotbed=recognition_data.get('name', ''),
                 projectName_recognitionsResearchHotbed=recognition_data.get('project_name', ''),
-                participantsNames_recognitionsResearchHotbed=participants_names,  # AUTO-COMPLETADO
+                participantsNames_recognitionsResearchHotbed=participants_names,
                 organizationName_recognitionsResearchHotbed=recognition_data.get('organization_name', '')
             )
             
@@ -115,10 +113,18 @@ def register_activity(data):
             db.session.flush()
             recognition_id = new_recognition.idrecognitionsResearchHotbed
 
-        # Crear la actividad principal
+        # Obtener el nombre del responsable (primer autor seleccionado)
+        responsible_name = data.get('responsible', '')
+        if not responsible_name and data.get('authors_ids'):
+            first_author_urh = db.session.query(UsersResearchHotbed).filter_by(idusersResearchHotbed=data.get('authors_ids')[0]).first()
+            if first_author_urh:
+                user_info = db.session.query(User).filter_by(iduser=first_author_urh.user_iduser).first()
+                responsible_name = user_info.name_user if user_info else 'Autor principal'
+
+        # CLAVE: Crear la actividad con el usuario creador SOLO para tracking, NO para autoría
         activity = ActivitiesResearchHotbed(
             title_activitiesResearchHotbed=data['title'],
-            responsible_activitiesResearchHotbed=data.get('responsible', ''),
+            responsible_activitiesResearchHotbed=responsible_name,  # Primer autor seleccionado
             date_activitiesResearchHotbed=datetime.strptime(data['date'], '%Y-%m-%d').date(),
             description_activitiesResearchHotbed=data['description'],
             type_activitiesResearchHotbed=data.get('type', 'actividad'),
@@ -126,8 +132,8 @@ def register_activity(data):
             endTime_activitiesResearchHotbed=datetime.strptime(data['end_time'], '%H:%M').time() if data.get('end_time') else None,
             duration_activitiesResearchHotbed=data.get('duration'),
             approvedFreeHours_activitiesResearchHotbed=1.0 if data.get('approved_free_hours') else 0.0,
-            semester=data.get('semester', 'semestre-1-2025'),  # CORREGIDO: Campo semester
-            usersResearchHotbed_idusersResearchHotbed=data['userResearchHotbedId'],
+            semester=data.get('semester', 'semestre-1-2025'),
+            usersResearchHotbed_idusersResearchHotbed=data['userResearchHotbedId'],  # Solo para tracking/creación
             projectsResearchHotbed_idprojectsResearchHotbed=project_id,
             productsResearchHotbed_idproductsResearchHotbed=product_id,
             recognitionsResearchHotbed_idrecognitionsResearchHotbed=recognition_id
@@ -136,8 +142,18 @@ def register_activity(data):
         db.session.add(activity)
         db.session.flush()
 
+        print(f"DEBUG: Actividad creada con ID: {activity.idactivitiesResearchHotbed}")
+        print(f"DEBUG: Responsable asignado: {responsible_name}")
+        print(f"DEBUG: Usuario creador (tracking): {data['userResearchHotbedId']}")
+        print(f"DEBUG: Autores a registrar: {data.get('authors_ids', [])}")
+        print(f"DEBUG: Co-autores a registrar: {data.get('co_authors_ids', [])}")
+
+        # CRÍTICO: Solo crear relaciones de autoría para los usuarios seleccionados
+        # NO agregar automáticamente al usuario creador
+
         # Crear relaciones de autoría para autores principales
         for author_id in data.get('authors_ids', []):
+            print(f"DEBUG: Agregando autor principal ID: {author_id}")
             author_relation = ActivityAuthors(
                 activity_id=activity.idactivitiesResearchHotbed,
                 user_research_hotbed_id=author_id,
@@ -147,6 +163,7 @@ def register_activity(data):
 
         # Crear relaciones de autoría para co-autores
         for co_author_id in data.get('co_authors_ids', []):
+            print(f"DEBUG: Agregando co-autor ID: {co_author_id}")
             co_author_relation = ActivityAuthors(
                 activity_id=activity.idactivitiesResearchHotbed,
                 user_research_hotbed_id=co_author_id,
@@ -156,6 +173,8 @@ def register_activity(data):
 
         db.session.commit()
 
+        print(f"DEBUG: Actividad registrada exitosamente")
+
         return jsonify({
             "message": "Actividad registrada exitosamente",
             "activity_id": activity.idactivitiesResearchHotbed
@@ -163,8 +182,11 @@ def register_activity(data):
 
     except ValueError as ve:
         db.session.rollback()
+        print(f"ERROR ValueError: {str(ve)}")
         return jsonify({"error": f"Error en formato de fecha: {str(ve)}"}), 400
     except Exception as e:
         db.session.rollback()
-        print(f"Error en register_activity: {str(e)}")
+        print(f"ERROR Exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500

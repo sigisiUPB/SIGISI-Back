@@ -362,14 +362,10 @@ def create_user_projects_sheet(writer, projects, sheet_name):
     projects_data = []
     
     for project in projects:
-        # Determinar rol del usuario
-        user_role = get_user_role_in_activity_simple(project)
-        
         project_info = {
             'Título del Informe': project['title'],
             'Fecha de Realización': project['date'].strftime('%d/%m/%Y'),
             'Semillero Asociado': project['research_hotbed_name'],
-            'Mi Participación': user_role,
             'Duración (Horas Académicas)': f"{project['duration']} hrs",
             'Horario de Realización': f"{project['start_time']} - {project['end_time']}" if project['start_time'] and project['end_time'] else 'No especificado',
             'Estado de Horas Libres': 'Aprobadas' if project['approved_free_hours'] else 'Pendientes',
@@ -402,14 +398,10 @@ def create_user_products_sheet(writer, products, sheet_name):
     products_data = []
     
     for product in products:
-        # Determinar rol del usuario
-        user_role = get_user_role_in_activity_simple(product)
-        
         product_info = {
             'Título del Informe': product['title'],
             'Fecha de Realización': product['date'].strftime('%d/%m/%Y'),
             'Semillero Asociado': product['research_hotbed_name'],
-            'Mi Participación': user_role,
             'Duración (Horas Académicas)': f"{product['duration']} hrs",
             'Horario de Realización': f"{product['start_time']} - {product['end_time']}" if product['start_time'] and product['end_time'] else 'No especificado',
             'Estado de Horas Libres': 'Aprobadas' if product['approved_free_hours'] else 'Pendientes',
@@ -449,14 +441,10 @@ def create_user_recognitions_sheet(writer, recognitions, sheet_name):
     recognitions_data = []
     
     for recognition in recognitions:
-        # Determinar rol del usuario
-        user_role = get_user_role_in_activity_simple(recognition)
-        
         recognition_info = {
             'Título del Informe': recognition['title'],
             'Fecha de Realización': recognition['date'].strftime('%d/%m/%Y'),
             'Semillero Asociado': recognition['research_hotbed_name'],
-            'Mi Participación': user_role,
             'Duración (Horas Académicas)': f"{recognition['duration']} hrs",
             'Horario de Realización': f"{recognition['start_time']} - {recognition['end_time']}" if recognition['start_time'] and recognition['end_time'] else 'No especificado',
             'Estado de Horas Libres': 'Aprobadas' if recognition['approved_free_hours'] else 'Pendientes',
@@ -495,14 +483,10 @@ def create_user_generic_activities_sheet(writer, activities, sheet_name):
     activities_data = []
     
     for activity in activities:
-        # Determinar rol del usuario
-        user_role = get_user_role_in_activity_simple(activity)
-        
         activity_info = {
             'Título del Informe': activity['title'],
             'Fecha de Realización': activity['date'].strftime('%d/%m/%Y'),
             'Semillero Asociado': activity['research_hotbed_name'],
-            'Mi Participación': user_role,
             'Duración (Horas Académicas)': f"{activity['duration']} hrs",
             'Horario de Realización': f"{activity['start_time']} - {activity['end_time']}" if activity['start_time'] and activity['end_time'] else 'No especificado',
             'Estado de Horas Libres': 'Aprobadas' if activity['approved_free_hours'] else 'Pendientes',
@@ -707,10 +691,9 @@ def apply_user_activities_sheet_styles(sheet, header_font, body_font,
                                       center_alignment, left_alignment, header_border, body_border):
     """Aplica estilos específicos a las hojas de actividades del usuario"""
     
-    # Color para actividades aprobadas/pendientes y roles
+    # Color para actividades aprobadas/pendientes
     approved_fill = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')  # Verde claro
     pending_fill = PatternFill(start_color='FEF3C7', end_color='FEF3C7', fill_type='solid')   # Amarillo claro
-    author_fill = PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid')    # Azul claro
     
     for row_num, row in enumerate(sheet.iter_rows(), 1):
         for col_num, cell in enumerate(row, 1):
@@ -724,30 +707,21 @@ def apply_user_activities_sheet_styles(sheet, header_font, body_font,
                 cell.font = body_font
                 
                 # Alineación específica por tipo de columna
-                if col_num in [1, 3, 8]:  # Título, semillero, descripción a la izquierda
+                if col_num in [1, 3, 7]:  # Título, semillero, descripción a la izquierda
                     cell.alignment = left_alignment
-                elif col_num in [2, 5, 6]:  # Fecha, duración, horario centrados
+                elif col_num in [2, 4, 5]:  # Fecha, duración, horario centrados
                     cell.alignment = center_alignment
                 else:
                     cell.alignment = left_alignment
                 
-                # Colorear filas según estado y participación
+                # Colorear filas según estado de horas libres
                 # Buscar columna "Estado de Horas Libres"
                 horas_libres_col = None
-                participacion_col = None
                 
                 for col_idx, header_cell in enumerate(sheet[1], 1):
                     if header_cell.value == 'Estado de Horas Libres':
                         horas_libres_col = col_idx
-                    elif header_cell.value == 'Mi Participación':
-                        participacion_col = col_idx
-                
-                # Priorizar color por participación, luego por estado
-                if participacion_col:
-                    participacion_cell = sheet.cell(row=row_num, column=participacion_col)
-                    if participacion_cell.value and 'autor' in str(participacion_cell.value).lower():
-                        cell.fill = author_fill
-                        continue
+                        break
                 
                 if horas_libres_col:
                     status_cell = sheet.cell(row=row_num, column=horas_libres_col)
@@ -977,17 +951,8 @@ def get_research_hotbed_name(user_research_hotbed_id):
 
 def get_user_role_in_activity_simple(activity):
     """Determina el rol del usuario en una actividad de forma simplificada"""
-    authors = activity.get('authors', {})
-    
-    # Esta función se usa en el contexto donde ya sabemos que el usuario participa
-    # Se puede mejorar con lógica adicional si es necesario
-    
-    if authors.get('main_authors'):
-        return "Autor principal"
-    elif authors.get('co_authors'):
-        return "Co-autor"
-    else:
-        return "Participante"
+    # Esta función ya no se usa, pero se mantiene por compatibilidad
+    return "Participante"
 
 def get_activities_by_semester(research_hotbed_id, semester):
     """Obtiene actividades filtradas por semestre usando el campo 'semester' de la actividad"""
